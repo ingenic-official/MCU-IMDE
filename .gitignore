@@ -1,0 +1,10 @@
+node_modules/
+out/
+*.vsix
+*.tgz
+*.tsbuildinfo
+npm-debug.log*
+
+# Local screenshots and manual references
+现状.png
+guiconfig.png
