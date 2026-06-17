@@ -98,8 +98,8 @@ export function activate(context: vscode.ExtensionContext) {
   // ---- Commands ----
   context.subscriptions.push(
     vscode.commands.registerCommand("imde.doctor", () => {
-      diagnostics.clear();
-      runner.runTerminal("doctor", [], { show: true });
+      // Open IMDE terminal with shell completion sourced, ready for interactive use
+      runner.runTerminal("", [], { show: true });
       pollRefresh(() => doctorTree.refresh(true), 2000, 2);
     }),
     vscode.commands.registerCommand("imde.build", async () => {
