@@ -1,0 +1,15 @@
+.vscode/**
+src/**
+test/**
+.gitignore
+tsconfig.json
+node_modules/**
+*.vsix
+*.tgz
+*.tsbuildinfo
+dist/**/*.map
+icon.svg
+现状.png
+guiconfig.png
+package-lock.json
+webpack.config.js

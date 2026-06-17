@@ -1,0 +1,356 @@
+@charset "utf-8";
+
+// =============================================
+// IMDE Brand Design Tokens
+// =============================================
+$ingenic-blue: #005BAC;
+$ingenic-blue-light: #0080E0;
+$ingenic-blue-dark: #003D73;
+$ingenic-navy: rgb(0, 0, 128);
+
+// =============================================
+// Animations
+// =============================================
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    max-height: 300px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes valueFlash {
+  0% { background-color: rgba(0, 91, 172, 0.25); }
+  100% { background-color: transparent; }
+}
+
+@keyframes borderPulse {
+  0%, 100% { border-color: var(--accent-blue); box-shadow: 0 0 0 0 rgba(0, 91, 172, 0.4); }
+  50% { border-color: var(--accent-blue-light); box-shadow: 0 0 0 3px rgba(0, 91, 172, 0); }
+}
+
+@keyframes logoReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotate(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes splashGlow {
+  0%, 100% {
+    opacity: 0.03;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.08;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes splashLogoEntry {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) rotate(-15deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes splashTextReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    letter-spacing: 8px;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: 3px;
+  }
+}
+
+@keyframes splashSubReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splashProgressShimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+@keyframes splashStatusPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes contentReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rowStagger {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes subtleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes headerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toolbarPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes valueFlashGlow {
+  0% { background-color: rgba(0, 91, 172, 0.2); box-shadow: 0 0 0 0 rgba(0, 91, 172, 0.3); }
+  50% { background-color: rgba(0, 91, 172, 0.08); box-shadow: 0 0 12px 2px rgba(0, 91, 172, 0.1); }
+  100% { background-color: transparent; box-shadow: 0 0 0 0 rgba(0, 91, 172, 0); }
+}
+
+@keyframes checkPop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes menuExpand {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes searchHighlight {
+  0% { background-color: rgba(0, 91, 172, 0.15); }
+  100% { background-color: transparent; }
+}
+
+// Skeleton loading
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+// =============================================
+// Base Styles
+// =============================================
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family);
+  font-weight: var(--vscode-font-weight);
+  font-size: var(--vscode-font-size);
+}
+
+.title:not(:last-child) {
+  margin-bottom: 0.2rem;
+}
+.section.no-padding-top {
+  padding-top: 0;
+}
+
+h1.title,
+p.subtitle {
+  color: var(--vscode-foreground);
+}
+
+.title,
+.subtitle,
+.label {
+  color: var(--vscode-foreground);
+}
+
+.notification {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-notifications-background);
+}
+.notification:not(:last-child) {
+  margin-bottom: 0.8em;
+}
+
+.table,
+.table thead td,
+.table thead th {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-notifications-background);
+}
+.table td,
+.table th {
+  border-color: var(--vscode-sideBar-dropBackground);
+}
+body.vscode-dark table.is-hoverable tbody tr:not(.is-selected):hover {
+  background-color: var(--vscode-sideBar-dropBackground);
+}
+
+.table.is-striped tbody tr:not(.is-selected):nth-child(even) {
+  background-color: var(--vscode-badge-background);
+}
+
+.button {
+  background-color: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.button:disabled {
+  background-color: var(--vscode-notifications-background);
+}
+.button:active {
+  box-shadow: none;
+}
+.button:hover:disabled {
+  color: var(--vscode-button-foreground);
+}
+.button:hover:enabled,
+button > span.icon:hover,
+button > span.icon > i:hover {
+  background-color: var(--vscode-button-hoverBackground);
+  border-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.button:focus,
+.button.is-focused {
+  border-color: var(--vscode-button-foreground);
+}
+
+.input,
+.textarea,
+.select select {
+  background-color: var(--vscode-input-background);
+  border-color: var(--vscode-input-border);
+  color: var(--vscode-input-foreground);
+}
+.input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+.select select:hover,
+.textarea:hover,
+.input:hover {
+  border-color: var(--vscode-inputOption-activeBorder) !important;
+}
+.select:hover::after {
+  border-color: var(--vscode-focusBorder) !important;
+}
+.select select:active,
+.select select:focus,
+.input:active,
+.input:focus {
+  border-color: var(--vscode-inputOption-activeBorder);
+}
+.is-hidden {
+  opacity: 0;
+}
+div.plotly-notifier {
+  visibility: hidden;
+}
+
+#icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
