@@ -2,7 +2,7 @@
   "name": "imde",
   "displayName": "IMDE",
   "description": "Ingenic MCU Development Environment — VS Code integration",
-  "version": "0.3.4",
+  "version": "0.3.5-beta",
   "publisher": "ingenic",
   "license": "ISC",
   "icon": "icon.png",
