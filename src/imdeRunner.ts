@@ -202,28 +202,17 @@ export class ImdeRunner implements vscode.Disposable {
     }
   }
 
-  /** Source shell completion script for bash/zsh/pwsh when terminal is first created. */
+  /** Source the full IMDE environment script when terminal is first created. */
   private sourceCompletion(proj: string): void {
-    const compDir = path.join(proj, "tools", "imde", "completion");
+    const imdeDir = path.join(proj, "tools", "imde");
     const shell = (vscode.env.shell || "").toLowerCase();
 
     let sourceCmd: string;
     if (shell.includes("powershell") || shell.includes("pwsh")) {
-      const ps1 = path.join(compDir, "imde.ps1");
-      if (fs.existsSync(ps1)) {
-        sourceCmd = `. '${ps1.replace(/\\/g, "\\\\")}'`;
-      } else { return; }
-    } else if (shell.includes("zsh")) {
-      const zsh = path.join(compDir, "imde.zsh");
-      if (fs.existsSync(zsh)) {
-        sourceCmd = `source '${zsh}'`;
-      } else { return; }
+      sourceCmd = `. '${path.join(imdeDir, "env.ps1").replace(/\\/g, "\\\\")}'`;
     } else {
-      // bash (default)
-      const bash = path.join(compDir, "imde.bash");
-      if (fs.existsSync(bash)) {
-        sourceCmd = `source '${bash}'`;
-      } else { return; }
+      // bash / zsh — use env.sh which auto-detects
+      sourceCmd = `source '${path.join(imdeDir, "env.sh")}'`;
     }
 
     if (this.terminal) { this.terminal.sendText(sourceCmd); }
