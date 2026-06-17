@@ -59,16 +59,40 @@ export async function selectDefconfig(
 }
 
 export async function saveDefconfig(runner: ImdeRunner) {
-  const name = await vscode.window.showInputBox({
-    prompt: "Defconfig name (without _defconfig suffix) — saved to config/",
-    placeHolder: "myboard -> config/myboard_defconfig",
-    validateInput: (v) => {
-      if (!v.trim()) return "Name is required";
-      if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(v.trim())) return "Use letters, numbers, underscores, or dashes";
-      return undefined;
-    },
+  // Show existing defconfigs as reference with autocomplete through QuickPick search
+  const existing = await runner.captureJson<{ defconfigs?: Array<{ token: string; relativePath?: string }> }>("list-defconfigs");
+  const items: vscode.QuickPickItem[] = (existing?.defconfigs || []).map(d => ({
+    label: d.token,
+    description: d.relativePath || "config/" + d.token + "_defconfig",
+    detail: "$(history) Click to reuse name",
+  }));
+  items.unshift({
+    label: "$(add) New defconfig…",
+    description: "Type a new defconfig name",
+    detail: "Will be saved as config/<name>_defconfig",
   });
-  if (!name) return;
+
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: "Save current config as defconfig…",
+    matchOnDescription: true,
+  });
+  if (!picked) return;
+
+  let name: string | undefined;
+  if (picked.label.startsWith("$(add)")) {
+    name = await vscode.window.showInputBox({
+      prompt: "Defconfig name (without _defconfig suffix) — saved to config/",
+      placeHolder: "myboard → config/myboard_defconfig",
+      validateInput: (v) => {
+        if (!v.trim()) return "Name is required";
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(v.trim())) return "Use letters, numbers, underscores, or dashes";
+        return undefined;
+      },
+    });
+  } else {
+    name = picked.label;
+  }
+  if (!name?.trim()) return;
 
   await runner.runCommand("save-defconfig", [name.trim()], {
     progressTitle: `Saving ${name.trim()}_defconfig`, streamOutput: true,
