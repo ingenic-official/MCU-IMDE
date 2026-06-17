@@ -6,6 +6,7 @@ export interface MenuInitialPayload {
   title: string;
   type: Menu["type"];
   value: any;
+  help?: string;
   children: MenuInitialPayload[];
   isVisible?: boolean;
   isCollapsed?: boolean;
@@ -88,6 +89,7 @@ function toInitialPayload(menu: Menu, children: MenuInitialPayload[] = []): Menu
     isMainMenu: menu.isMainMenu,
     indentLevel: menu.indentLevel,
     shouldIndentChildren: menu.shouldIndentChildren,
+    help: menu.help,
   };
 }
 

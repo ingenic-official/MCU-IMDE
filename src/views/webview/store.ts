@@ -407,6 +407,7 @@ export const useMenuconfigStore = defineStore("menuconfig", () => {
   }
 
   function setAllMenusCollapsed(collapsed: boolean, menus?: Menu[]) {
+    if (collapsed) closeAllHelp();
     const menusToProcess = menus || items.value;
     menusToProcess.forEach(item => {
       // 判断是否为 mainmenu，与 configElement.vue 中的 isMainMenu 逻辑保持一致

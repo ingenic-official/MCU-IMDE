@@ -394,6 +394,7 @@ const splashStatusText = computed(() => {
 
 function handleCollapseUpdate(id: string, value: boolean) {
   store.setMenuCollapseById(id, value);
+  if (value) store.closeAllHelp();
   collapseTick.value++;
 }
 
