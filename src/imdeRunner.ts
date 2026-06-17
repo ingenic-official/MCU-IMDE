@@ -156,7 +156,8 @@ export class ImdeRunner implements vscode.Disposable {
     const cfg = vscode.workspace.getConfiguration("imde");
     const termName = cfg.get<string>("terminalName") || "IMDE";
 
-    if (!this.terminal || this.terminal.exitStatus !== undefined) {
+    const isNewTerminal = !this.terminal || this.terminal.exitStatus !== undefined;
+    if (isNewTerminal) {
       const existing = vscode.window.terminals.find(t => t.name === termName);
       if (existing) {
         this.terminal = existing;
@@ -165,10 +166,12 @@ export class ImdeRunner implements vscode.Disposable {
           name: termName,
           cwd: proj,
         });
+        // Source shell completion so tab-completion works immediately
+        this.sourceCompletion(proj);
       }
     }
 
-    let tokens: string[];
+    let tokens: string[] = [];
     if (imdeBin) {
       let hasX = false;
       try { hasX = (fs.statSync(imdeBin).mode & 0o111) !== 0; } catch {}
@@ -191,10 +194,39 @@ export class ImdeRunner implements vscode.Disposable {
       tokens = [py, imde, "--project-dir", proj, cmd, ...args];
     }
 
-    this.terminal.sendText(this.formatTerminalCommand(tokens));
-    if (opts?.show) {
+    if (cmd && this.terminal) {
+      this.terminal.sendText(this.formatTerminalCommand(tokens));
+    }
+    if (opts?.show && this.terminal) {
       this.terminal.show(true);
     }
+  }
+
+  /** Source shell completion script for bash/zsh/pwsh when terminal is first created. */
+  private sourceCompletion(proj: string): void {
+    const compDir = path.join(proj, "tools", "imde", "completion");
+    const shell = (vscode.env.shell || "").toLowerCase();
+
+    let sourceCmd: string;
+    if (shell.includes("powershell") || shell.includes("pwsh")) {
+      const ps1 = path.join(compDir, "imde.ps1");
+      if (fs.existsSync(ps1)) {
+        sourceCmd = `. '${ps1.replace(/\\/g, "\\\\")}'`;
+      } else { return; }
+    } else if (shell.includes("zsh")) {
+      const zsh = path.join(compDir, "imde.zsh");
+      if (fs.existsSync(zsh)) {
+        sourceCmd = `source '${zsh}'`;
+      } else { return; }
+    } else {
+      // bash (default)
+      const bash = path.join(compDir, "imde.bash");
+      if (fs.existsSync(bash)) {
+        sourceCmd = `source '${bash}'`;
+      } else { return; }
+    }
+
+    if (this.terminal) { this.terminal.sendText(sourceCmd); }
   }
 
   run(cmd: string, args: string[] = [], opts?: { show?: boolean }): void {
