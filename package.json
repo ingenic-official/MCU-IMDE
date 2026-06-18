@@ -18,7 +18,8 @@
     "onCommand:imde.build",
     "onCommand:imde.doctor",
     "onCommand:imde.fullCleanBuild",
-    "onCommand:imde.viewMap"
+    "onCommand:imde.viewMap",
+    "onCommand:imde.serialMonitor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -103,6 +104,11 @@
       {
         "command": "imde.openFile",
         "title": "IMDE: Open Source File"
+      },
+      {
+        "command": "imde.serialMonitor",
+        "title": "IMDE: Serial Monitor",
+        "icon": "$(plug)"
       }
     ],
     "viewsContainers": {
