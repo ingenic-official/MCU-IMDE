@@ -182,6 +182,36 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("imde.saveDefconfig", () =>
       saveDefconfig(runner)
     ),
+
+    // ---- Serial Monitor ----
+    vscode.commands.registerCommand("imde.serialMonitor", async () => {
+      const portsResult = await runner.captureJson<{ ports?: Array<{ port: string; description: string }> }>("serial-ports");
+      const ports = portsResult?.ports || [];
+      if (ports.length === 0) {
+        vscode.window.showWarningMessage("No serial ports detected. Connect a device and try again.");
+        return;
+      }
+
+      const portItems = ports.map(p => ({
+        label: p.port,
+        description: p.description,
+        detail: p.description ? `${p.port} — ${p.description}` : p.port,
+      }));
+
+      const picked = await vscode.window.showQuickPick(portItems, {
+        placeHolder: "Select serial port…",
+        matchOnDescription: true,
+      });
+      if (!picked) return;
+
+      const baudrates = ["115200", "921600", "460800", "230400", "57600", "38400", "19200", "9600"];
+      const baud = await vscode.window.showQuickPick(baudrates, {
+        placeHolder: `Baud rate for ${picked.label} (default: 115200)`,
+      });
+      if (!baud) return;
+
+      runner.runTerminal("serial-monitor", [picked.label, "--baudrate", baud], { show: true });
+    }),
     vscode.commands.registerCommand("imde.copyPath", async (itemOrPath: ArtifactTreeItem | string) => {
       const filePath = typeof itemOrPath === "string" ? itemOrPath : itemOrPath.artifactPath;
       await vscode.env.clipboard.writeText(filePath);
@@ -345,6 +375,7 @@ export function activate(context: vscode.ExtensionContext) {
     mkBar("$(list-selection) Select", "imde.selectDefconfig", "Select Defconfig", 97),
     mkBar("$(settings) Config", "imde.guiConfig", "GUI Config", 96),
     mapBar,
+    mkBar("$(plug) Serial", "imde.serialMonitor", "Serial Monitor", 94),
   );
 }
 
