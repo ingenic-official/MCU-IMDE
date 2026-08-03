@@ -26,8 +26,8 @@ interface HotCacheEntry {
 }
 
 export class KconfigSessionCache {
-    private static readonly CACHE_VERSION = 3;
-    private static readonly CACHE_KEY_VERSION = "v3";
+    private static readonly CACHE_VERSION = 5;
+    private static readonly CACHE_KEY_VERSION = "v5";
     private static readonly MAX_STAT_CONCURRENCY = 64;
     private static readonly HOT_CACHE_TTL_MS = 10000;
     private static readonly HOT_CACHE_MAX_ENTRIES = 4;
@@ -45,6 +45,29 @@ export class KconfigSessionCache {
             .createHash("sha1")
             .update(`${path.normalize(mainKconfigFile)}|${KconfigSessionCache.CACHE_KEY_VERSION}`)
             .digest("hex");
+    }
+
+    public static clearHotCache(): void {
+        KconfigSessionCache.hotCache.clear();
+    }
+
+    public async invalidate(cacheKey?: string): Promise<void> {
+        if (cacheKey) {
+            KconfigSessionCache.hotCache.delete(cacheKey);
+            try {
+                await fs.promises.unlink(this.getCacheFilePath(cacheKey));
+            } catch {
+                // Cache invalidation is best-effort.
+            }
+            return;
+        }
+
+        KconfigSessionCache.clearHotCache();
+        try {
+            await fs.promises.rm(this.cacheDir, { recursive: true, force: true });
+        } catch {
+            // Cache invalidation is best-effort.
+        }
     }
 
     public async load(cacheKey: string): Promise<Menu[] | null> {

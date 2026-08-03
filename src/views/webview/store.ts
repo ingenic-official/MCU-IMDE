@@ -409,20 +409,32 @@ export const useMenuconfigStore = defineStore("menuconfig", () => {
   function setAllMenusCollapsed(collapsed: boolean, menus?: Menu[]) {
     if (collapsed) closeAllHelp();
     const menusToProcess = menus || items.value;
-    menusToProcess.forEach(item => {
-      // 判断是否为 mainmenu，与 configElement.vue 中的 isMainMenu 逻辑保持一致
+    const nextOverrides = new Map(collapseOverrides.value);
+    let changed = false;
+
+    const walk = (item: Menu) => {
       const isMainMenu = item.isMainMenu === true ||
                         (typeof item.id === 'string' && item.id.startsWith("mainmenu-")) ||
                         item.name === "__MAINMENU__";
 
-      // 只对非 mainmenu 的 menu 类型项进行折叠操作
       if (item.type === 'menu' && !isMainMenu) {
         item.isCollapsed = collapsed;
+        const key = item.id || item.name;
+        if (key) {
+          nextOverrides.set(key, collapsed);
+          changed = true;
+        }
       }
       if (item.children && item.children.length > 0) {
-        setAllMenusCollapsed(collapsed, item.children);
+        item.children.forEach(walk);
       }
-    });
+    };
+    menusToProcess.forEach(walk);
+
+    if (changed) {
+      collapseOverrides.value = nextOverrides;
+      collapseTick.value++;
+    }
   }
 
   function collapseAllMenus() {

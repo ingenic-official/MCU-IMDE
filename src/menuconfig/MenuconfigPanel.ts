@@ -11,6 +11,7 @@
 // limitations under the License.
 
 import * as path from "path";
+import * as fs from "fs";
 import * as vscode from "vscode";
 import { Menu, menuType } from "./Menu";
 import { KconfigServer } from "./KconfigServer";
@@ -35,7 +36,6 @@ export class MenuconfigPanel {
   public static currentPanel: MenuconfigPanel | undefined;
   private static panelSeq = 0;
   private _disposed = false;
-  private static readonly supportedThemes = ["modern", "default"] as const;
   private static readonly initialPayloadChunkSize = 120;
   private static readonly initialPayloadTaskBatchSize = 32;
   private static readonly startupSlowThresholdMs = 1500;
@@ -126,10 +126,9 @@ export class MenuconfigPanel {
     const scriptPath = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(extensionUri, "dist", "views", "webview-bundle.js")
     );
-    const themeKey = this.resolveUiTheme();
     const colorThemeKind = this.mapColorThemeKind(vscode.window.activeColorTheme.kind);
     const savedGuiTheme = this.extContext.workspaceState.get<string>("imde.guiThemeOverride", "");
-    this.panel.webview.html = this.createMenuconfigHtml(scriptPath, themeKey, colorThemeKind, savedGuiTheme);
+    this.panel.webview.html = this.createMenuconfigHtml(scriptPath, colorThemeKind, savedGuiTheme);
     this.trace("webview html assigned");
     this.registerColorThemeSync();
 
@@ -155,21 +154,16 @@ export class MenuconfigPanel {
     this.panel.webview.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case "updateValue": {
-          // Handle value update
           const updatedMenu = JSON.parse(message.updated_value) as Menu;
-          // Logger.info(`[PANEL] Received updateValue message: ${message.updated_value}`);
-          // Logger.info(`[PANEL] Parsed menu: id=${updatedMenu.id}, name=${updatedMenu.name}, type=${updatedMenu.type}, value=${updatedMenu.value}`);
-          
+
           if (this.kconfigServer) {
             this.kconfigServer.updateValue(updatedMenu);
-            // Logger.info(`[PANEL] updateValue processed and delta events dispatched`);
           } else {
             Logger.error(`[PANEL] KconfigServer not available for updateValue`);
           }
           break;
         }
         case "saveChanges":
-          // Logger.info(`[PANEL] Received saveChanges message`);
           if (this.kconfigServer) {
             const ans = await vscode.window.showInformationMessage(
               "Apply changes to .config and reconfigure?", { modal: true },
@@ -179,23 +173,20 @@ export class MenuconfigPanel {
             try {
               await this.kconfigServer.saveConfig();
               vscode.window.setStatusBarMessage(`$(check) ${t('save.success')}`, 3000);
-              // Sync build system after config change
-              vscode.commands.executeCommand("imde.configure").then(
-                () => {},
-                () => vscode.window.setStatusBarMessage("$(warning) Config saved but configure failed", 5000)
-              );
+              const configured = await vscode.commands.executeCommand<boolean>("imde.configure");
+              if (configured === false) {
+                vscode.window.setStatusBarMessage("$(warning) Config saved but configure failed", 5000);
+              }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);
               vscode.window.showErrorMessage(`${t('save.failed')}: ${errorMessage}`);
               Logger.error("Save configuration failed", error as Error);
             }
           } else {
-            // Logger.warn(`[PANEL] KconfigServer not available for saveChanges`);
             vscode.window.setStatusBarMessage("$(check) Configuration saved!", 3000);
           }
           break;
         case "discardChanges":
-          // Logger.info(`[PANEL] Received discardChanges message`);
           if (this.kconfigServer) {
             try {
               await this.kconfigServer.discardChanges();
@@ -207,7 +198,6 @@ export class MenuconfigPanel {
               Logger.error("Discard changes failed", error as Error);
             }
           } else {
-            // Logger.warn(`[PANEL] KconfigServer not available for discardChanges`);
             vscode.window.setStatusBarMessage("$(discard) Changes discarded!", 3000);
           }
           break;
@@ -238,6 +228,11 @@ export class MenuconfigPanel {
           }
           break;
         
+        }
+        case "saveGuiTheme": {
+          const theme = message.theme === "light" || message.theme === "dark" ? message.theme : "";
+          await this.extContext.workspaceState.update("imde.guiThemeOverride", theme);
+          break;
         }
 
         case "setDefault":
@@ -297,8 +292,8 @@ export class MenuconfigPanel {
             const filepath = path.join(this.curWorkspaceFolder.fsPath, input.trim());
             try {
               const configContent = await this.kconfigServer.exportConfigText();
-              await require("fs").promises.mkdir(require("path").dirname(filepath), { recursive: true });
-              await require("fs").promises.writeFile(filepath, configContent, "utf8");
+              await fs.promises.mkdir(path.dirname(filepath), { recursive: true });
+              await fs.promises.writeFile(filepath, configContent, "utf8");
               vscode.window.showInformationMessage("Config saved: " + input.trim());
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);
@@ -435,14 +430,14 @@ export class MenuconfigPanel {
         const kconfigPath = path.join(this.curWorkspaceFolder.fsPath, "Kconfig");
         const kconfigAltPath = path.join(this.curWorkspaceFolder.fsPath, "imde.guiConfig");
         
-        if (require("fs").existsSync(kconfigPath)) {
+        if (fs.existsSync(kconfigPath)) {
           kconfigFile = kconfigPath;
-        } else if (require("fs").existsSync(kconfigAltPath)) {
+        } else if (fs.existsSync(kconfigAltPath)) {
           kconfigFile = kconfigAltPath;
         }
       }
       
-      if (kconfigFile && require("fs").existsSync(kconfigFile)) {
+      if (kconfigFile && fs.existsSync(kconfigFile)) {
         this.trace(`initializeKconfigServer init target=${kconfigFile}`);
         const server = await KconfigServer.init({
           workspaceFolder: this.curWorkspaceFolder,
@@ -463,18 +458,7 @@ export class MenuconfigPanel {
         this.kconfigServer.on("configReset", (menus: Menu[]) => { this.safelySendMenuData("refresh_values", menus); });
         
         this.kconfigServer.on("changesDiscarded", (menus: Menu[]) => {
-          // Logger.info(`[PANEL] Received changesDiscarded event, sending ${menus.length} menus to UI`);
-
-          // Log a few sample menu values for debugging
-          for (let i = 0; i < Math.min(menus.length, 5); i++) {
-            const menu = menus[i];
-            if (menu.name) {
-              // Logger.info(`[PANEL] Menu sample ${i}: ${menu.name} (${menu.type}) = ${menu.value}`);
-            }
-          }
-
           this.safelySendMenuData("refresh_values", menus);
-          // Notification is already shown in the discardChanges message handler
         });
         
         // Listen to visibility changes
@@ -740,17 +724,6 @@ export class MenuconfigPanel {
     }
   }
 
-  private resolveUiTheme(): string {
-    const configured = vscode.workspace
-      .getConfiguration("imde.guiConfig")
-      .get<string>("uiTheme", MenuconfigPanel.supportedThemes[0]);
-
-    if (configured && MenuconfigPanel.supportedThemes.includes(configured as typeof MenuconfigPanel.supportedThemes[number])) {
-      return configured;
-    }
-    return MenuconfigPanel.supportedThemes[0];
-  }
-
   private mapColorThemeKind(kind: vscode.ColorThemeKind): WebviewColorTheme {
     switch (kind) {
       case vscode.ColorThemeKind.Light:
@@ -779,10 +752,10 @@ export class MenuconfigPanel {
     this.disposables.push(disposable);
   }
 
-  private createMenuconfigHtml(scriptPath: vscode.Uri, themeKey: string, colorThemeKind: WebviewColorTheme, savedGuiTheme?: string) {
+  private createMenuconfigHtml(scriptPath: vscode.Uri, colorThemeKind: WebviewColorTheme, savedGuiTheme?: string) {
     const nonce = this.getNonce();
-    const sanitizedTheme = themeKey.replace(/"/g, "&quot;");
     const sanitizedColorKind = colorThemeKind.replace(/"/g, "&quot;");
+    const sanitizedSavedTheme = savedGuiTheme === "light" || savedGuiTheme === "dark" ? savedGuiTheme : "";
     
     return `<!DOCTYPE html>
         <html lang="en">
@@ -807,7 +780,7 @@ export class MenuconfigPanel {
             </head>
             <body>
               <div id="menuconfig">Loading...</div>
-              <script nonce="${nonce}">window.__KCONFIG_THEME__ = "${sanitizedTheme}";window.__KCONFIG_VSCODE_COLOR_THEME__ = "${sanitizedColorKind}";</script>
+              <script nonce="${nonce}">window.__KCONFIG_VSCODE_COLOR_THEME__ = "${sanitizedColorKind}";window.__IMDE_GUI_THEME_OVERRIDE__ = "${sanitizedSavedTheme}";</script>
               <script nonce="${nonce}" src="${scriptPath}"></script>
             </body>
         </html>`;

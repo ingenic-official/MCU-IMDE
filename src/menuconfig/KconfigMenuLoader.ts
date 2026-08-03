@@ -14,43 +14,11 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { Menu, menuType } from "./Menu";
-import { formatHelpText } from "./helpTextFormatter";
 import { Logger } from "../logger/logger";
 import { KconfigParser } from "./KconfigParser";
 import { KconfigSessionCache } from "./KconfigSessionCache";
 
 export class KconfigMenuLoader {
-  public static updateValues(
-    config: Menu,
-    values: { values: any; visible: any; ranges: any }
-  ): Menu {
-    const newConfig: Menu = config;
-    if (
-      Object.prototype.hasOwnProperty.call(values.values, newConfig.name) &&
-      newConfig.type !== menuType.choice
-    ) {
-      newConfig.value =
-        newConfig.type === menuType.hex
-          ? values.values[newConfig.name].toString(16)
-          : values.values[newConfig.name];
-    }
-    if (Object.prototype.hasOwnProperty.call(values.visible, newConfig.id)) {
-      newConfig.isVisible = values.visible[newConfig.id];
-    }
-    if (Object.prototype.hasOwnProperty.call(values.ranges, newConfig.name)) {
-      newConfig.range = values.ranges[newConfig.name];
-    }
-    for (let i = 0; i < newConfig.children.length; i++) {
-      newConfig.children[i] = this.updateValues(newConfig.children[i], values);
-      if (newConfig.type === menuType.choice) {
-        values.values[newConfig.children[i].name]
-          ? (newConfig.value = newConfig.children[i].name)
-          : (newConfig.children[i].value = false);
-      }
-    }
-    return newConfig;
-  }
-
   private workspaceFolder: vscode.Uri;
   private targetFile?: vscode.Uri;
 
@@ -71,18 +39,17 @@ export class KconfigMenuLoader {
           const parsedMenus = await this.parseMenusWithCache(targetPath);
           
           if (parsedMenus.length === 0) {
-            Logger.warn("No menus parsed from target Kconfig file, using demo menus");
-            return this.createDemoMenus();
+            throw new Error(`No menus parsed from target Kconfig file: ${targetPath}`);
           }
           
           Logger.info(`Successfully parsed ${parsedMenus.length} menus from target Kconfig file`);
           return parsedMenus;
         } catch (error) {
           Logger.error("Failed to parse target Kconfig file", error as Error);
-          return this.createDemoMenus();
+          throw error;
         }
       } else {
-        Logger.warn(`Target Kconfig file not found: ${targetPath}`);
+        throw new Error(`Target Kconfig file not found: ${targetPath}`);
       }
     }
     
@@ -101,15 +68,14 @@ export class KconfigMenuLoader {
       const parsedMenus = await this.parseMenusWithCache(mainKconfigFile);
       
       if (parsedMenus.length === 0) {
-        Logger.warn("No menus parsed from Kconfig files, using demo menus");
-        return this.createDemoMenus();
+        throw new Error(`No menus parsed from Kconfig file: ${mainKconfigFile}`);
       }
       
       Logger.info(`Successfully parsed ${parsedMenus.length} menus from Kconfig files`);
       return parsedMenus;
     } catch (error) {
       Logger.error("Failed to parse Kconfig files", error as Error);
-      return this.createDemoMenus();
+      throw error;
     }
   }
 
@@ -119,8 +85,12 @@ export class KconfigMenuLoader {
 
     const cachedMenus = await cache.load(cacheKey);
     if (cachedMenus && cachedMenus.length > 0) {
-      Logger.info(() => `[SESSION_CACHE] Loaded ${cachedMenus.length} menus from cache: ${mainKconfigFile}`);
-      return cachedMenus;
+      if (!this.hasEmptyChoice(cachedMenus)) {
+        Logger.info(() => `[SESSION_CACHE] Loaded ${cachedMenus.length} menus from cache: ${mainKconfigFile}`);
+        return cachedMenus;
+      }
+      Logger.info(() => `[SESSION_CACHE] Discarded incomplete choice data: ${mainKconfigFile}`);
+      await cache.invalidate(cacheKey);
     }
 
     const parser = new KconfigParser({
@@ -129,37 +99,19 @@ export class KconfigMenuLoader {
     });
 
     const parsedMenus = await parser.parse();
-    if (parsedMenus.length > 0) {
+    if (parsedMenus.length > 0 && !this.hasEmptyChoice(parsedMenus)) {
       await cache.save(cacheKey, parsedMenus, parser.getParsedFiles());
     }
     return parsedMenus;
   }
 
-
-  public mapJsonToMenuObject(config: any): Menu {
-    const menu: Menu = {
-      id: config.id,
-      name: config.name,
-      help: formatHelpText(config.help),
-      range: config.range,
-      title: config.title,
-      type: config.type,
-      isCollapsed: false,
-      isMenuconfig: config.is_menuconfig,
-      isVisible: false,
-      dependsOn: config.depends_on,
-      children: [],
-      value: null,
-      select: [],
-      selectedBy: [],
-      hasPrompt: true
-    };
-    for (const child of config.children) {
-      const childMenu: Menu = this.mapJsonToMenuObject(child);
-      menu.children.push(childMenu);
-    }
-    return menu;
+  private hasEmptyChoice(menus: Menu[]): boolean {
+    return menus.some(menu =>
+      (menu.type === menuType.choice && (!menu.children || menu.children.length === 0)) ||
+      (menu.children && menu.children.length > 0 && this.hasEmptyChoice(menu.children))
+    );
   }
+
 
   private findKconfigFiles(): string[] {
     const kconfigFiles: string[] = [];

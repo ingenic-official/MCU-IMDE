@@ -2,6 +2,11 @@ import * as fs from "fs";
 import { Menu, menuType } from "./Menu";
 import { ConditionEvaluator, ConfigContext } from "./ConditionEvaluator";
 import { Logger } from "../logger/logger";
+import {
+    normalizeConfigStringValue,
+    normalizeHexValue as normalizeKconfigHexValue,
+    normalizeIntValue as normalizeKconfigIntValue
+} from "./MenuValueUtils";
 
 export interface SymbolAssignment {
     name: string;
@@ -559,120 +564,29 @@ export class KconfigWriter {
         }
     }
 
-    private expandStringValue(value: string): string {
-        if (!value) {
-            return value;
-        }
-
-        return value.replace(/\$\(([^)]+)\)|\$([A-Za-z_][A-Za-z0-9_]*)/g, (_match, p1, p2) => {
-            const varName = p1 || p2;
-            if (!varName) {
-                return '';
-            }
-            const envValue = process.env[varName];
-            return envValue !== undefined ? envValue : '';
-        });
-    }
-
     private normalizeIntValue(menu: Menu): number | null {
-        const raw = menu.value;
-        if (raw === null || raw === undefined || raw === "") {
-            return null;
-        }
-
-        const parsed = typeof raw === "number" ? raw : parseInt(raw.toString(), 10);
-        if (Number.isNaN(parsed)) {
-            return null;
-        }
-
-        if (menu.range && menu.range.length >= 2) {
-            const [min, max] = menu.range;
-            let value = parsed;
-            if (Number.isFinite(min) && value < min) {
-                value = min;
-            }
-            if (Number.isFinite(max) && value > max) {
-                value = max;
-            }
-            return value;
-        }
-
-        return parsed;
+        return normalizeKconfigIntValue(menu.value, menu.range);
     }
 
     private normalizeHexValue(menu: Menu): string {
-        const raw = menu.value;
-        if (raw === null || raw === undefined || raw === "") {
-            return "";
-        }
-
-        let numeric: number | null = null;
-        if (typeof raw === "number") {
-            numeric = raw;
-        } else if (typeof raw === "string") {
-            const normalized = raw.startsWith("0x") || raw.startsWith("0X") ? raw.slice(2) : raw;
-            const parsed = parseInt(normalized, 16);
-            if (!Number.isNaN(parsed)) {
-                numeric = parsed;
-            }
-        }
-
-        if (numeric !== null) {
-            if (menu.range && menu.range.length >= 2) {
-                const [min, max] = menu.range;
-                if (Number.isFinite(min) && numeric < min) {
-                    numeric = min;
-                } else if (Number.isFinite(max) && numeric > max) {
-                    numeric = max;
-                }
-            }
-            return "0x" + numeric.toString(16).toUpperCase();
-        }
-
-        const strValue = raw.toString();
-        if (strValue.startsWith("0x") || strValue.startsWith("0X")) {
-            return "0x" + strValue.slice(2).toUpperCase();
-        }
-        return "0x" + strValue.toUpperCase();
+        return normalizeKconfigHexValue(menu.value, menu.range);
     }
 
     private normalizeStringValue(menu: Menu): string | null {
-        const raw = menu.value;
-        if (raw === null || raw === undefined) {
-            return null;
-        }
-        return this.expandStringValue(raw.toString());
+        return normalizeConfigStringValue(menu.value);
     }
 
     private normalizeDefaultInt(value: any): number | null {
-        if (value === null || value === undefined || value === "") {
-            return null;
-        }
-        const parsed = typeof value === "number" ? value : parseInt(value.toString(), 10);
-        return Number.isNaN(parsed) ? null : parsed;
+        return normalizeKconfigIntValue(value);
     }
 
     private normalizeDefaultHex(value: any): string | null {
-        if (value === null || value === undefined || value === "") {
-            return null;
-        }
-        if (typeof value === "string") {
-            if (value.startsWith("0x") || value.startsWith("0X")) {
-                return value;
-            }
-        }
-        const parsed = typeof value === "number" ? value : parseInt(value.toString(), 16);
-        if (Number.isNaN(parsed)) {
-            return null;
-        }
-        return "0x" + parsed.toString(16).toUpperCase();
+        const normalized = normalizeKconfigHexValue(value);
+        return normalized || null;
     }
 
     private normalizeDefaultString(value: any): string | null {
-        if (value === null || value === undefined) {
-            return null;
-        }
-        return this.expandStringValue(value.toString());
+        return normalizeConfigStringValue(value);
     }
 
     private toTristate(value: any): "y" | "m" | "n" {

@@ -15,6 +15,17 @@
 import { Menu, menuType } from "./Menu";
 import { ConditionEvaluator, ConfigContext } from "./ConditionEvaluator";
 import { Logger } from "../logger/logger";
+import {
+  normalizeTristateValue,
+  clampTristateValue as clampTristate,
+  getMenuTriStrength,
+  areMenuValuesEqual,
+  isKeyword,
+  getFallbackValueForType,
+  normalizeConfigStringValue,
+  normalizeHexValue,
+  normalizeIntValue,
+} from "./MenuValueUtils";
 
 /**
  * Dependency relationship between configuration items
@@ -112,7 +123,6 @@ export class VisibilityManager {
         Logger.debugVisibility(`Initialization complete:`);
         Logger.debugVisibility(`  - Dependencies: ${this.dependencies.size}`);
         Logger.debugVisibility(`  - Config values: ${Object.keys(this.configValues).length}`);
-        this.logVisibilityState();
     }
 
     /**
@@ -219,13 +229,48 @@ export class VisibilityManager {
     private applyChoiceDefaults(changes?: Set<string>): void {
         const process = (menu: Menu) => {
             if (menu.type === 'choice' && menu.children && menu.children.length > 0) {
-                // 如果当前值已经是合法的子项名称，保证子项布尔值与之同步即可
-                const childNames = new Set(menu.children.map(c => c.name));
+                if (!this.isMenuDependencySatisfied(menu)) {
+                    if (menu.value !== null) {
+                        menu.value = null;
+                        if (changes) {
+                            changes.add(menu.id);
+                        }
+                    }
+                    for (const child of menu.children) {
+                        if (child.type !== menuType.bool && child.type !== menuType.tristate) {
+                            continue;
+                        }
+                        const disabledValue = child.type === menuType.tristate ? 'n' : false;
+                        if (!this.areMenuValuesEqual(child.value, disabledValue, child.type) || this.configValues[child.name] !== disabledValue) {
+                            child.value = disabledValue;
+                            this.configValues[child.name] = disabledValue;
+                            this.evaluator.setValue(child.name, disabledValue);
+                            if (changes) {
+                                changes.add(child.id);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                const selectableChildren = menu.children.filter(child => this.isChoiceOptionSelectable(child));
+                const childNames = new Set(selectableChildren.map(c => c.name));
                 let selectedName: string | null = null;
                 let selectionSource: 'child' | 'value' | 'default' | 'fallback' | null = null;
 
+                if (menu.isDefaultValue !== false && menu.defaults && menu.defaults.length > 0) {
+                    const effectiveDefault = this.selectEffectiveDefault(menu);
+                    if (effectiveDefault && typeof effectiveDefault.value === 'string' && childNames.has(effectiveDefault.value)) {
+                        selectedName = effectiveDefault.value;
+                        selectionSource = 'default';
+                    }
+                }
+
                 // 优先：从已有子项布尔值为 true 的项反推 choice 选择（对齐 Kconfiglib 行为）
-                for (const child of menu.children) {
+                for (const child of selectableChildren) {
+                    if (selectedName) {
+                        break;
+                    }
                     if (child.type === menuType.bool && child.value === true && childNames.has(child.name)) {
                         selectedName = child.name;
                         selectionSource = 'child';
@@ -250,8 +295,8 @@ export class VisibilityManager {
 
                     // 若依然没有，则回退到第一个子项
                     if (!selectedName) {
-                        selectedName = menu.children[0].name;
-                        selectionSource = 'fallback';
+                        selectedName = selectableChildren[0]?.name || null;
+                        selectionSource = selectedName ? 'fallback' : null;
                     }
                 }
 
@@ -296,6 +341,21 @@ export class VisibilityManager {
                             }
                         }
                     }
+                } else {
+                    for (const child of menu.children) {
+                        if (child.type !== menuType.bool && child.type !== menuType.tristate) {
+                            continue;
+                        }
+                        const disabledValue = child.type === menuType.tristate ? 'n' : false;
+                        if (!this.areMenuValuesEqual(child.value, disabledValue, child.type) || this.configValues[child.name] !== disabledValue) {
+                            child.value = disabledValue;
+                            this.configValues[child.name] = disabledValue;
+                            this.evaluator.setValue(child.name, disabledValue);
+                            if (changes) {
+                                changes.add(child.id);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -309,12 +369,75 @@ export class VisibilityManager {
         this.evaluator.updateContext(this.configValues);
     }
 
+    private isMenuDependencySatisfied(menu: Menu): boolean {
+        if (!menu.dependsOn || menu.dependsOn.trim() === '') {
+            return true;
+        }
+        try {
+            return this.evaluator.evaluate(menu.dependsOn);
+        } catch (error) {
+            Logger.warn(`Failed to evaluate choice dependency for ${menu.name}: ${menu.dependsOn}. Error: ${error}`);
+            return false;
+        }
+    }
+
+    private isChoiceOptionSelectable(child: Menu): boolean {
+        if (!child.name) {
+            return false;
+        }
+        return this.isMenuDependencySatisfied(child);
+    }
+
+    private syncChoiceChildrenFromValues(changed?: Set<string>): Set<string> {
+        const localChanged = changed ?? new Set<string>();
+        const process = (menu: Menu) => {
+            if (menu.type === menuType.choice && menu.children && menu.children.length > 0) {
+                const selectedName = typeof menu.value === 'string' ? menu.value : null;
+                const selectedChild = selectedName
+                    ? menu.children.find(child => child.name === selectedName)
+                    : undefined;
+                const selectedIsSelectable = selectedChild ? this.isChoiceOptionSelectable(selectedChild) : false;
+
+                for (const child of menu.children) {
+                    if (child.type !== menuType.bool && child.type !== menuType.tristate) {
+                        continue;
+                    }
+
+                    const nextValue = selectedIsSelectable && child.name === selectedName
+                        ? (child.type === menuType.tristate ? 'y' : true)
+                        : (child.type === menuType.tristate ? 'n' : false);
+
+                    if (!this.areMenuValuesEqual(child.value, nextValue, child.type) || this.configValues[child.name] !== nextValue) {
+                        child.value = nextValue;
+                        this.configValues[child.name] = nextValue;
+                        this.evaluator.setValue(child.name, nextValue);
+                        this.markMenuAndPeersChanged(child, localChanged);
+                    }
+                }
+            }
+
+            if (menu.children) {
+                menu.children.forEach(process);
+            }
+        };
+
+        this.allMenus.forEach(process);
+        this.evaluator.updateContext(this.configValues);
+        return localChanged;
+    }
+
     /**
      * 解析 default 值并转换为目标类型，同时处理符号引用
      */
     private parseDefaultForType(value: any, type: menuType): any {
         if (value === undefined || value === null) {
             return value;
+        }
+
+        if (type === menuType.choice) {
+            return typeof value === 'string'
+                ? value.trim().replace(/^"(.*)"$/, '$1')
+                : value;
         }
 
         const resolved = this.resolveDefaultReference(value);
@@ -347,32 +470,11 @@ export class VisibilityManager {
                 }
                 return 'n';
             case menuType.int:
-                if (typeof resolved === 'number') return resolved;
-                if (typeof v === 'string') {
-                    const parsed = parseInt(v, 10);
-                    return Number.isNaN(parsed) ? 0 : parsed;
-                }
-                return 0;
+                return normalizeIntValue(resolved) ?? 0;
             case menuType.hex:
-                if (typeof v === 'string') {
-                    if (v.startsWith('0x') || v.startsWith('0X')) {
-                        return v;
-                    }
-                    const parsed = parseInt(v, 10);
-                    return Number.isNaN(parsed) ? '0x0' : `0x${parsed.toString(16)}`;
-                }
-                if (typeof resolved === 'number') {
-                    return `0x${resolved.toString(16)}`;
-                }
-                return '0x0';
+                return normalizeHexValue(resolved) || '0x0';
             case menuType.string:
-                if (typeof resolved === 'string') {
-                    return resolved.replace(/^"(.*)"$/, '$1');
-                }
-                if (resolved === null || resolved === undefined) {
-                    return '';
-                }
-                return String(resolved);
+                return normalizeConfigStringValue(resolved) ?? '';
             default:
                 return resolved;
         }
@@ -401,20 +503,7 @@ export class VisibilityManager {
     }
 
     private getFallbackValueForType(type: menuType): any {
-        switch (type) {
-            case menuType.bool:
-                return false;
-            case menuType.tristate:
-                return 'n';
-            case menuType.int:
-                return 0;
-            case menuType.hex:
-                return '0x0';
-            case menuType.string:
-                return '';
-            default:
-                return null;
-        }
+        return getFallbackValueForType(type);
     }
 
     /**
@@ -444,10 +533,7 @@ export class VisibilityManager {
     }
 
     private areMenuValuesEqual(a: any, b: any, type: menuType): boolean {
-        if (type === menuType.int) {
-            return Number(a) === Number(b);
-        }
-        return a === b;
+        return areMenuValuesEqual(a, b, type);
     }
 
     /**
@@ -645,6 +731,8 @@ export class VisibilityManager {
         this.enforceDependencyBounds(valueChangeSeeds);
         const implyChanges = this.applyImplyConstraints();
         this.enforceDependencyBounds(valueChangeSeeds);
+        const choiceSyncChanges = this.syncChoiceChildrenFromValues(valueChangeSeeds);
+        choiceSyncChanges.forEach(itemId => valueChangeSeeds.add(itemId));
         implyChanges.forEach(itemId => valueChangeSeeds.add(itemId));
 
         const tristateChanges = this.updateTristateAllowedValues();
@@ -899,8 +987,7 @@ export class VisibilityManager {
      * Check if a string is a keyword or operator
      */
     private isKeyword(str: string): boolean {
-        const keywords = new Set(['TRUE', 'FALSE', 'Y', 'N', 'M']);
-        return keywords.has(str.toUpperCase());
+        return isKeyword(str);
     }
 
     private rebuildIndexes(menus: Menu[]): void {
@@ -1048,78 +1135,15 @@ export class VisibilityManager {
     }
 
     private normalizeTristateValue(value: any): 'n' | 'm' | 'y' {
-        if (typeof value === 'string') {
-            const lower = value.toLowerCase();
-            if (lower === 'y' || lower === 'm' || lower === 'n') {
-                return lower as 'n' | 'm' | 'y';
-            }
-            if (lower === 'true' || lower === '2') {
-                return 'y';
-            }
-            if (lower === '1') {
-                return 'm';
-            }
-            return 'n';
-        }
-        if (typeof value === 'number') {
-            if (value >= 2) {
-                return 'y';
-            }
-            if (value === 1) {
-                return 'm';
-            }
-            return 'n';
-        }
-        if (typeof value === 'boolean') {
-            return value ? 'y' : 'n';
-        }
-        return 'n';
+        return normalizeTristateValue(value);
     }
 
     private clampTristateValue(allowed: Array<'n' | 'm' | 'y'>, current: 'n' | 'm' | 'y'): 'n' | 'm' | 'y' {
-        const currentIndex = this.tristateOrder.indexOf(current);
-        if (currentIndex === -1) {
-            return allowed[0];
-        }
-
-        for (let i = currentIndex; i < this.tristateOrder.length; i++) {
-            const candidate = this.tristateOrder[i];
-            if (allowed.includes(candidate)) {
-                return candidate;
-            }
-        }
-
-        for (let i = currentIndex - 1; i >= 0; i--) {
-            const candidate = this.tristateOrder[i];
-            if (allowed.includes(candidate)) {
-                return candidate;
-            }
-        }
-
-        return allowed[0];
+        return clampTristate(allowed, current, this.tristateOrder);
     }
 
     private getMenuTriStrength(menu: Menu | null): number {
-        if (!menu) {
-            return 0;
-        }
-        const value = menu.value;
-        if (menu.type === menuType.bool) {
-            if (value === true || value === 'y' || value === 2) {
-                return 2;
-            }
-            return 0;
-        }
-        if (menu.type === menuType.tristate) {
-            if (value === 'y' || value === true || value === 2) {
-                return 2;
-            }
-            if (value === 'm' || value === 1) {
-                return 1;
-            }
-            return 0;
-        }
-        return 0;
+        return getMenuTriStrength(menu);
     }
 
     private setMenuStrength(menu: Menu, strength: number): void {
@@ -1972,76 +1996,6 @@ export class VisibilityManager {
         this.allMenus.forEach(searchForSelectors);
     }
 
-    /**
-     * Log current visibility state for debugging
-     */
-    private logVisibilityState(): void {
-        // Logger.info(`[VISIBILITY_STATE] Current visibility state:`);
-        
-        const logMenu = (menu: Menu, depth = 0) => {
-            const _indent = "  ".repeat(depth);
-            const _visIcon = menu.isVisible ? "👁️" : "🙈";
-            const _depInfo = menu.dependsOn ? ` (depends: ${menu.dependsOn})` : " (no depends)";
-            
-            // Logger.info(`${indent}${visIcon} ${menu.name || menu.title}: ${menu.isVisible}${depInfo}`);
-            
-            // Debug dependency evaluation
-            if (menu.dependsOn) {
-                try {
-                    const _evalResult = this.evaluator.evaluate(menu.dependsOn);
-                    // Logger.info(`${indent}  -> Condition "${menu.dependsOn}" evaluates to: ${evalResult}`);
-                } catch (error) {
-                    // Logger.info(`${indent}  -> Condition evaluation failed: ${error}`);
-                }
-            }
-            
-            if (menu.children && menu.children.length > 0) {
-                menu.children.forEach(child => logMenu(child, depth + 1));
-            }
-        };
-        
-        this.allMenus.forEach(menu => logMenu(menu));
-        
-        // Logger.info(`[CONFIG_VALUES] Current config values:`);
-        // Object.entries(this.configValues).forEach(([key, value]) => {
-        //     Logger.info(`  ${key}: ${value} (${typeof value})`);
-        // });
-        
-        // Logger.info(`[DEPENDENCIES] Dependency graph:`);
-        // this.dependencies.forEach((depInfo, configId) => {
-        //     const menu = this.findMenuById(configId);
-        //     const menuName = menu ? menu.name : 'unknown';
-        //     Logger.info(`  ${configId} (${menuName}): depends on "${depInfo.dependsOn}", has ${depInfo.dependents.size} dependents`);
-        // });
-    }
-
-    /**
-     * Debug select relationships for troubleshooting
-     */
-    public debugSelectRelationships(): void {
-        // Logger.info(`[DEBUG] Select relationships:`);
-        
-        const logSelectInfo = (menu: Menu, depth = 0) => {
-            const _indent = "  ".repeat(depth);
-            
-            if (menu.name) {
-                const _selectInfo = menu.select && menu.select.length > 0 ? ` selects: [${menu.select.join(', ')}]` : '';
-                const _selectedByInfo = menu.selectedBy && menu.selectedBy.length > 0 ? ` selected by: [${menu.selectedBy.join(', ')}]` : '';
-                const _readonlyInfo = menu.isReadonly ? ' (READONLY)' : '';
-                
-                // Logger.info(`${indent}${menu.name} = ${menu.value}${selectInfo}${selectedByInfo}${readonlyInfo}`);
-                if (menu.readonlyReason) {
-                    // Logger.info(`${indent}  -> Readonly reason: ${menu.readonlyReason}`);
-                }
-            }
-            
-            if (menu.children) {
-                menu.children.forEach(child => logSelectInfo(child, depth + 1));
-            }
-        };
-        
-        this.allMenus.forEach(menu => logSelectInfo(menu));
-    }
 
     /**
      * 判断一个带有 select 的“选择器”是否有效启用（匹配 Kconfiglib tri_value 语义的关键部分）

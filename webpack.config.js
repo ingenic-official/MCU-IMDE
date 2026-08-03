@@ -41,7 +41,7 @@ module.exports = (env, argv) => {
               loader: 'ts-loader',
               options: {
                 compilerOptions: {
-                  module: 'es6',
+                  module: 'es2020',
                 },
               },
             },
@@ -118,13 +118,13 @@ module.exports = (env, argv) => {
       conditionNames: ['import'],
       extensions: ['.ts', '.js', '.vue', '.json'],
       alias: {
-        Vue: 'vue/dist/vue.esm-bundler.js',
+        Vue: 'vue/dist/vue.runtime.esm-bundler.js',
       },
       fallback: {
-        os: require.resolve('os-browserify/browser'),
-        path: require.resolve('path-browserify'),
-        stream: require.resolve('stream-browserify'),
-        assert: require.resolve('assert/'),
+        os: false,
+        path: false,
+        stream: false,
+        assert: false,
       },
     },
     plugins: [

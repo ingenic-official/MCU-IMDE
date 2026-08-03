@@ -1,8 +1,106 @@
 # Changelog
 
-## 0.3.5-beta (WIP)
+## 0.3.6 (stable) — 2026.07.22
 
-### 待定
+### Pinmux 与 BSP
+- 新增基于 `.impx` Pinlist 的 Pinmux 配置工具，支持按芯片、封装和板级 BSP 打开配置。
+- 新增芯片 Pinout 画布、功能分类、Pin Group、Owner 搜索、引脚冲突提示、撤销、重做和清空配置。
+- 三栏 Pinmux 工作区支持拖动调整 Model、Configuration 和 Pinout 的可用空间，支持折叠、键盘调整、双击恢复默认宽度，并在关闭后记住上次宽度。
+- 支持 GPIO 输入输出、上下拉、驱动能力、Slew、Schmitt、有效电平和 Owner 配置。
+- 支持解析现有 `board_pinmux.c` / `board_pins.h`，并根据当前选择生成对应 BSP 文件。
+- 支持选定芯片后创建空白 BSP，不再要求复制已有板级目录；新芯片的第一块板自动成为默认板。
+- 新建 BSP 自动维护芯片级 CMake/Kconfig，保留已有默认板，不重复改写无变化的板级 Kconfig。
+- BSP ID 支持数字开头，仍限制为小写字母、数字和下划线。
+- 移除 Pinmux 写入时的 `.imde.bak` 文件，保留失败时的事务回滚，避免工程目录产生额外文件。
+- 生成代码统一使用 IMSIS GPIO 接口，并通过公共 `bsp_pinmux_init()` 接入初始化流程。
+
+### 插件性能与资源管理
+- Pinmux 保持动态加载，仅在执行 Pinmux 命令时加载相关解析器、生成器和 Webview 模块。
+- Doctor 与 Artifacts 视图改为首次打开时懒加载，插件启动时不再主动执行对应 CLI 查询。
+- Map 状态栏改为本地文件检查和文件监听，移除每 10 秒执行一次的 artifacts CLI 轮询。
+- IntelliSense 配置内容无变化时不再重复写入 `c_cpp_properties.json`。
+- 启动期定时器纳入扩展生命周期清理，减少扩展关闭后的悬空任务。
+
+### GUI Config
+- Select Defconfig 从 defconfig 的 `CONFIG_SOC_SERIES_*` 和 `CONFIG_BOARD_*` 解析并显示 Microchip、Board，不再把目录名误标为 Board。
+- 修复 Kconfig prompt 中转义双引号解析异常，例如 `3.5\"` 这类英寸描述。
+- 修复 `menu` / `if` / `choice` / `depends on` 组合场景下可见性判断异常。
+- 修复 `choice` 内通过 `source` 引入的选项未解析，以及旧会话缓存持续保留空选项的问题。
+- Helper 展开中区分 `Direct depends on` 与 `Effective visibility`，避免局部依赖和继承条件混在一起显示。
+- 增加 Kconfig 解析测试覆盖。
+
+### IMDE Terminal
+- Build / Configure / Clean / FullClean 改回共享 VS Code 集成终端 `IMDE`。
+- 移除 `IMDE: build` 这类伪终端体验。
+- 终端环境只初始化一次，后续按钮触发显示短命令，例如 `imde fullclean --yes` / `imde build`。
+- 保留退出码、输出采集、Problems 诊断、树视图刷新和 `fullclean -> build` 串行执行能力。
+
+### Memory Map
+- 放大 `Current View` / `Top Modules` 信息块。
+- 增加卡片 padding、行距、字体尺寸和 mini bar 高度。
+- 调整为更舒展的自适应 grid，减少底部信息区拥挤感。
+
+### 工程
+- 版本更新为稳定版 `0.3.6`。
+- `npm run check` / `npm test` 通过。
+
+## 0.3.5 (stable) — 2026.07.02
+
+> **本版本不新增功能，专注于已知问题的修复与工程优化。**
+
+### Bundle 体积优化
+- **代码分割：** Menuconfig ~10k LOC 子系统改为动态 import，仅在打开 GUI Config 时加载
+- **代码分割：** Map View 解析器 + 面板改为动态 import，仅在打开 Map View 时加载
+- **代码分割：** `glob` 依赖（267 KB）延迟加载，不再捆绑到主入口
+- **效果：** eager-load `extension.js` 从 282 KB → 34 KB（⬇️ 88%），VSIX 从 ~470 KB → 137 KB（⬇️ 71%）
+- Vue build 从完整版切换到 runtime-only 版本（省 ~30 KB）
+- Webview polyfill（os/path/stream/assert）移除，省 ~15 KB
+- `sideEffects` 精确标记为 `["*.scss", "*.css", "*.vue"]`，避免 CSS 被误删
+- `package.json` 添加 `sideEffects` 标记，webpack tree-shake 更激进
+
+### 启动速度优化
+- **warmupEnv 异步化：** macOS/Linux 上 login shell 环境探测从同步阻塞 8 秒改为异步非阻塞
+- DoctorTree + ArtifactsTree 构造器不再立即 spawn 子进程，改为显式 refresh 触发
+- 启动时子进程数量从 3 个降至 1 个
+- `imde.serialMonitor` 悬空激活事件移除
+- 补齐 `onView:imde.doctorView/buildView/artifactsView` 激活事件
+
+### 代码洁净化
+- `Menu.value: any` → `MenuValue = string | number | boolean | null | undefined`，消除 ~70 处 any
+- 删除 ~110 行注释掉的 debug log（VisibilityManager / KconfigServer / MenuconfigPanel / fileWatcher）
+- 删除 9 个僵尸方法：logVisibilityState / debugSelectRelationships / logCurrentValues / formatHeaderLine / parseDefaultValue / isPureNegation / estimateSpeedImprovement / updateValues / mapJsonToMenuObject
+- 11 处 `require("fs")` / `require("os")` / `require("path")` 统一为顶部 `import`
+- 删除未实现的 "default"（树状）UI 主题及其 `imde.guiConfig.uiTheme` 配置项
+- `themes/index.ts` 从主题注册表简化为直接导出 ModernTheme
+- `MenuValueUtils.ts` 提取 6 个纯工具函数，消除 `areMenuValuesEqual` 重复
+- KconfigServer 中删除 RT-Thread 特定硬编码调试符号
+- `BuildTreeProvider.loading` 死状态字段删除
+- 删除 ~110 行未使用的 Bulma-style CSS（commons.scss）
+
+### 运行时资源管理
+- `python()` 系统探测增加静态缓存，避免每次命令都 spawnSync
+- `FileWatcher.instance` dispose 后正确置空，防止悬空引用
+- `ConditionEvaluator.astCache` 新增上限 5000 条目，超限自动清理
+- `execute()` error 路径增加 `proc.kill()`
+- `mapCache` 新增上限 8 条目，FIFO 淘汰
+- `ImdeRunner.dispose()` 增加 `jsonCache.clear()`
+- `ImdeRunner.resetProjectCheck()` 公开方法，支持 workspace 切换时重置
+- `loginEnvCache` 异步操作增加 Promise 追踪，防重复触发
+
+### Bug 修复
+- Artifacts 视图：修复启动时不自动加载（需手动点刷新）
+- GUI Config：修复 `"sideEffects": false` 误删 CSS 导致界面全坏 + 开屏动画丢失
+- `fs.statSync()` → `fs.promises.stat()` 异步化，防止 UI 线程阻塞
+- 新增 `onDidChangeWorkspaceFolders` 监听，切换工作区时自动重新检测
+
+### 移除
+- Peripheral Register Viewer（外设寄存器查看器）移除，脚本侧未同步更新
+- `savedGuiTheme` 死代码删除（从未实际使用）
+
+### 工程
+- 38 单元测试全部通过
+- `package.json` 添加 `repository` 字段
+- `tsconfig.json` + webpack ts-loader module 升级到 es2020
 
 ---
 

@@ -1,1 +1,3424 @@
-(()=>{"use strict";var e,t,i={398(e){e.exports=require("vscode")},896(e){e.exports=require("fs")},928(e){e.exports=require("path")},330(e){e.exports=JSON.parse('{"version":"0.3.5-beta"}')}},s={};function n(e){var t=s[e];if(void 0!==t)return t.exports;var r=s[e]={exports:{}};return i[e](r,r.exports,n),r.exports}t=Object.getPrototypeOf?e=>Object.getPrototypeOf(e):e=>e.__proto__,n.t=function(i,s){if(1&s&&(i=this(i)),8&s)return i;if("object"==typeof i&&i){if(4&s&&i.__esModule)return i;if(16&s&&"function"==typeof i.then)return i}var r=Object.create(null);n.r(r);var o={};e=e||[null,t({}),t([]),t(t)];for(var a=2&s&&i;("object"==typeof a||"function"==typeof a)&&!~e.indexOf(a);a=t(a))Object.getOwnPropertyNames(a).forEach(e=>o[e]=()=>i[e]);return o.default=()=>i,n.d(r,o),r},n.d=(e,t)=>{for(var i in t)n.o(t,i)&&!n.o(e,i)&&Object.defineProperty(e,i,{enumerable:!0,get:t[i]})},n.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),n.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})};var r={};n.r(r),n.d(r,{activate:()=>Bs,deactivate:()=>zs});var o=n(398),a=n(928);const l=require("child_process");var h,c=n(896);class u{terminal;output=o.window.createOutputChannel("IMDE");static loginEnvCache=null;dispose(){this.output.dispose()}static warmupEnv(){u.resolveLoginEnv(!0)}static resolveLoginEnv(e=!1){return u.loginEnvCache&&!e?u.loginEnvCache:"win32"===process.platform?(u.loginEnvCache={...process.env},u.loginEnvCache):u.captureShellEnv()}static captureShellEnv(){const e={...process.env};if("win32"===process.platform)return e;const t=process.env.SHELL||"/bin/bash",i=l.spawnSync(t,["-l","-c","echo __PATH__:$PATH"],{encoding:"utf8",timeout:3e3});if(0===i.status&&i.stdout){const t=i.stdout.match(/__PATH__:(.+)/);t&&(e.PATH=t[1])}const s=l.spawnSync(t,["-i","-c","echo __PATH__:$PATH"],{encoding:"utf8",timeout:5e3,stdio:["ignore","pipe","pipe"]});if(0===s.status&&s.stdout){const t=s.stdout.match(/__PATH__:(.+)/);t&&(e.PATH=t[1])}return u.loginEnvCache=e,e}getProjectDir(){const e=o.workspace.getConfiguration("imde"),t=e.get("projectDir")?.trim();if(t)return a.resolve(t);const i=o.workspace.workspaceFolders;if(!i?.length)return process.cwd();let s=i[0].uri.fsPath;for(;s!==a.dirname(s);){if(c.existsSync(a.join(s,"imde.json")))return s;s=a.dirname(s)}return i[0].uri.fsPath}showOutput(){this.output.show(!0)}log(e){this.output.appendLine(`[${(new Date).toLocaleTimeString()}] ${e}`)}python(){const e=this.getProjectDir(),t="win32"===process.platform?"windows":"linux"===process.platform?"linux":"macos",i=a.join(e,"tools","python",t,"windows"===t?"python.exe":"bin/python3");if(c.existsSync(i))return i;const s=u.resolveLoginEnv();for(const e of"windows"===t?["python","python3"]:["python3","python"])if(0===l.spawnSync(e,["--version"],{env:s}).status)return e;return null}imdePy(){return a.join(this.getProjectDir(),"tools","imde","imde.py")}imdeBin(){const e=this.getProjectDir(),t="win32"===process.platform?["tools/imde/bin/imde.cmd","tools/imde/bin/imde.bat"]:["tools/imde/bin/imde"];for(const i of t){const t=a.join(e,i);if(c.existsSync(t))return t}return null}spawnImdeBin(e,t){if("win32"===process.platform)return{exe:e,args:t};try{if(!(73&c.statSync(e).mode))return{exe:"/bin/sh",args:[e,...t]}}catch{}return{exe:e,args:t}}runTerminal(e,t=[],i){const s=this.getProjectDir(),n=this.imdeBin(),r=o.workspace.getConfiguration("imde").get("terminalName")||"IMDE";if(!this.terminal||void 0!==this.terminal.exitStatus){const e=o.window.terminals.find(e=>e.name===r);e?this.terminal=e:(this.terminal=o.window.createTerminal({name:r,cwd:s}),this.sourceCompletion(s))}let a=[];if(n){let i=!1;try{i=!!(73&c.statSync(n).mode)}catch{}a="win32"===process.platform||i?[n,e,...t]:["sh",n,e,...t]}else{const i=this.python();if(!i)return void o.window.showErrorMessage("Python not found");const n=this.imdePy();if(!c.existsSync(n))return void o.window.showErrorMessage(`IMDE CLI not found: ${n}`);a=[i,n,"--project-dir",s,e,...t]}e&&this.terminal&&this.terminal.sendText(this.formatTerminalCommand(a)),i?.show&&this.terminal&&this.terminal.show(!0)}sourceCompletion(e){const t=a.join(e,"tools","imde"),i=(o.env.shell||"").toLowerCase();let s;s=i.includes("powershell")||i.includes("pwsh")?`. '${a.join(t,"env.ps1").replace(/\\/g,"\\\\")}'`:`source '${a.join(t,"env.sh")}'`,this.terminal&&this.terminal.sendText(s)}run(e,t=[],i){this.runTerminal(e,t,i)}async runCommand(e,t=[],i={}){const s=()=>this.execute(e,t,{json:!1,streamOutput:i.streamOutput??!0,timeoutMs:i.timeoutMs??this.commandTimeoutMs(),onProgress:i.onProgress});return i.progressTitle?o.window.withProgress({location:o.ProgressLocation.Notification,title:i.progressTitle,cancellable:!1},async e=>{const t=Date.now();e.report({message:i.progressDetail??"Starting..."});const n=setInterval(()=>{const s=Math.max(1,Math.floor((Date.now()-t)/1e3));e.report({message:`${i.progressDetail??"Running"} (${s}s)`})},1e3);try{const i=await s(),n=Math.max(0,Math.floor((Date.now()-t)/1e3));return e.report({message:0!==i.code||i.timedOut?i.timedOut?`Timed out after ${n}s`:`Failed after ${n}s`:`Completed in ${n}s`}),i}finally{clearInterval(n)}}):s()}jsonCache=new Map;static CACHE_TTL=1e4;async captureJson(e,t=[]){const i=e+"|"+t.join(","),s=this.jsonCache.get(i);if(s&&Date.now()-s.ts<u.CACHE_TTL)return s.data;const n=await this.execute(e,t,{json:!0,streamOutput:!1,timeoutMs:this.captureTimeoutMs()});if(0!==n.code){const t=n.stderr?n.stderr.split("\n").filter(e=>!e.startsWith("  File ")&&!e.startsWith("    ")).slice(-3).join("\n").trim():"";return this.output.appendLine(`IMDE captureJson(${e}) failed: exit ${n.code}${t?" — "+t:""}`),null}try{const e=JSON.parse(n.stdout);return this.jsonCache.set(i,{data:e,ts:Date.now()}),e}catch{return this.output.appendLine(`IMDE captureJson(${e}) returned invalid JSON.`),this.output.appendLine(n.stdout.slice(0,500)),null}}execute(e,t,i){const s=this.getProjectDir(),n=this.imdeBin();let r,a;if(n){const o=this.spawnImdeBin(n,["--project-dir",s,...i.json?["--json"]:[],e,...t]);a=o.exe,r=o.args}else{const n=this.python(),l=this.imdePy();if(!n)return o.window.showErrorMessage("Python not found"),Promise.resolve({code:null,stdout:"",stderr:"Python not found",timedOut:!1,commandLine:""});if(!c.existsSync(l)){const e=`IMDE CLI not found: ${l}`;return o.window.showErrorMessage(e),Promise.resolve({code:null,stdout:"",stderr:e,timedOut:!1,commandLine:""})}a=n,r=[l,"--project-dir",s,...i.json?["--json"]:[],e,...t]}const h=this.formatForLog([a,...r]);return i.streamOutput&&this.output.appendLine(`> ${h}`),new Promise(e=>{let t="",n="",o=!1,c=!1;const d=u.resolveLoginEnv(),p=l.spawn(a,r,{cwd:s,env:{...d,PYTHONIOENCODING:process.env.PYTHONIOENCODING||"utf-8"}}),f=t=>{c||(c=!0,e(t))},g=i.timeoutMs>0?setTimeout(()=>{o=!0,p.kill()},i.timeoutMs):void 0;p.stdout.on("data",e=>{const s=e.toString();t+=s,i.streamOutput&&this.output.append(s),m(s)});const m=e=>{if(!i.onProgress)return;const t=e.match(/\[(\d+)\/(\d+)\]\s+(.+)/);t&&i.onProgress(parseInt(t[1],10),parseInt(t[2],10),t[3].trim())};p.stderr.on("data",e=>{const t=e.toString();n+=t,i.streamOutput&&this.output.append(t),m(t)}),p.on("error",e=>{g&&clearTimeout(g),f({code:null,stdout:t,stderr:n+e.message,timedOut:o,commandLine:h})}),p.on("close",e=>{g&&clearTimeout(g),i.streamOutput&&(this.output.appendLine(""),this.output.appendLine(o?`Timed out: ${h}`:`Exit code: ${e??"unknown"}`)),f({code:e,stdout:t,stderr:n,timedOut:o,commandLine:h})})})}captureTimeoutMs(){return o.workspace.getConfiguration("imde").get("captureTimeoutMs")??15e3}commandTimeoutMs(){return o.workspace.getConfiguration("imde").get("commandTimeoutMs")??0}formatForLog(e){return e.map(e=>e.includes(" ")?`"${e}"`:e).join(" ")}formatTerminalCommand(e){const t=(o.env.shell||"").toLowerCase(),i=t.includes("powershell")||t.includes("pwsh"),s=e.map(e=>this.quoteTerminalArg(e,t));return i?`& ${s.join(" ")}`:s.join(" ")}quoteTerminalArg(e,t){return e?t.includes("powershell")||t.includes("pwsh")?`'${e.replace(/'/g,"''")}'`:"win32"===process.platform&&t.includes("cmd")?`"${e.replace(/"/g,'\\"')}"`:`'${e.replace(/'/g,"'\\''")}'`:"''"}}class d{runner;_onDidChange=new o.EventEmitter;onDidChangeTreeData=this._onDidChange.event;cached=[];lastRefresh=0;refreshTimer;loading=!1;constructor(e){this.runner=e,this.refresh()}refresh(e=!1){const t=Date.now();!e&&t-this.lastRefresh<1e4?this.refreshTimer||(this.loading=!0,this._onDidChange.fire(),this.refreshTimer=setTimeout(()=>{this.refreshTimer=void 0,this._doRefresh()},1e4-(t-this.lastRefresh))):(this.refreshTimer&&(clearTimeout(this.refreshTimer),this.refreshTimer=void 0),this._doRefresh())}_doRefresh(){this.loading=!0,this._onDidChange.fire(),this.lastRefresh=Date.now(),this._fetch().then(e=>{this.cached=e,this.loading=!1,this._onDidChange.fire()})}getTreeItem(e){return e}getChildren(){if(this.loading){const e=new o.TreeItem("Refreshing environment...");return e.iconPath=new o.ThemeIcon("loading~spin"),[e]}return this.cached}async _fetch(){const e=await this.runner.captureJson("doctor");if(!e?.checks)return[this._error("Failed to run doctor")];const t=e.checks,i=[];return i.push(this._check("Python",!0,t.python?.version,t.python?.path)),i.push(this._check("CMake",t.cmake?.ok||!1,this._ver(t.cmake?.version),t.cmake?.path)),i.push(this._check("Ninja",t.ninja?.ok||!1,"",t.ninja?.path)),i.push(this._check("Toolchain",t.toolchain?.ok||!1,t.toolchain?.installedVersion,t.toolchain?.root)),i.push(this._check("Menuconfig",t.menuconfig?.ok||!1,"",t.menuconfig?.path)),i}_check(e,t,i,s){const n=new o.TreeItem(e);return n.iconPath=new o.ThemeIcon(t?"pass":"error"),n.description=i||(t?"OK":"FAIL"),n.tooltip=s||e,n}_ver(e){if(!e)return"";const t=e.split(" ");return t[t.length-1]||e}_error(e){const t=new o.TreeItem(e);return t.iconPath=new o.ThemeIcon("warning"),t}}class p extends o.TreeItem{artifactPath;constructor(e,t,i,s){super(e),this.artifactPath=t,this.description=i?s:"not built",this.iconPath=new o.ThemeIcon(i?"file":"circle-slash"),this.tooltip=t,i&&(this.command={command:"vscode.open",title:"Open",arguments:[o.Uri.file(t)]},this.contextValue=e.endsWith(".map")?"imdeMapArtifact":"imdeArtifact")}}class f{runner;_onDidChange=new o.EventEmitter;onDidChangeTreeData=this._onDidChange.event;cached=[];constructor(e){this.runner=e,this.refresh()}refresh(){this._fetch().then(e=>{this.cached=e,this._onDidChange.fire()})}getTreeItem(e){return e}getChildren(){return this.cached}async _fetch(){const e=await this.runner.captureJson("artifacts");if(!e?.artifacts){const e=new o.TreeItem("No artifacts available");return e.iconPath=new o.ThemeIcon("warning"),e.description="build first",[e]}return Object.entries(e.artifacts).map(([e,t])=>{const i=t.exists,s=t.size?`${(t.size/1024).toFixed(1)} KB`:"";return new p(e,t.path,i,s)})}}class g{runner;_onDidChange=new o.EventEmitter;onDidChangeTreeData=this._onDidChange.event;loading=!1;constructor(e){this.runner=e}refresh(){this._onDidChange.fire()}getTreeItem(e){return e}async getChildren(){const e=[];this.loading=!0;const t=await this.runner.captureJson("status");if(this.loading=!1,t){const i=t.state||"unknown",s=i.startsWith("matched")&&t.buildConfigured,n=new o.TreeItem(`Status: ${i}`,o.TreeItemCollapsibleState.None);if(n.iconPath=new o.ThemeIcon(s?"pass":"warning"),n.description=t.buildConfigured?"configured":"not configured",e.push(n),t.defconfig){const i=new o.TreeItem(`Defconfig: ${t.defconfig}`,o.TreeItemCollapsibleState.None);i.iconPath=new o.ThemeIcon("symbol-file"),e.push(i)}}else{const t=new o.TreeItem("Status unavailable",o.TreeItemCollapsibleState.None);t.iconPath=new o.ThemeIcon(this.loading?"loading~spin":"warning"),t.description="run doctor",t.command={command:"imde.doctor",title:"Run Doctor"},e.push(t)}const i=(e,t,i,s)=>{const n=new o.TreeItem(e,o.TreeItemCollapsibleState.None);return n.command={command:t,title:e},n.iconPath=new o.ThemeIcon(i),n.description=s,n};return e.push(i("Build","imde.build","play")),e.push(i("Configure","imde.configure","settings-gear")),e.push(i("Select Defconfig","imde.selectDefconfig","list-selection")),e.push(i("GUI Config","imde.guiConfig","settings")),e.push(i("Save Config","imde.saveDefconfig","save")),e.push(i("Clean","imde.clean","trash")),e.push(i("Full Clean","imde.fullclean","warning")),e}}!function(e){e.string="string",e.bool="bool",e.tristate="tristate",e.int="int",e.choice="choice",e.hex="hex",e.menu="menu",e.comment="comment"}(h||(h={}));const m=require("events"),y=/(\n\n-)[\s\S]*(\n)/g,w=/(\n\n-)[\s\S]*?(\n\n)/g,v=/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_+.~#?&//=]*)/g,b=/``(.*?)``/g,S="\n\n-",C=/\n-/g,E=/\n\n/g;function x(e){let t=function(e){if(e){let t=e;if(e.match(w)&&w.test(e)&&w.lastIndex!==e.length&&e.lastIndexOf("\n-")<w.lastIndex)return e.match(w).forEach(e=>{const i=`${e.replace(S,"<ul><li>").replace(C,"</li><li>")}</li></ul>`;t=t.replace(e,i)}),t}return e}(e);var i;return t=function(e){return e&&e.indexOf(S)>0&&(null===e.match(y)||y.test(e)&&y.lastIndex===e.length)?`${e.replace(S,"<ul><li>").replace(C,"</li><li>")}</li></ul>`:e}(t),t=function(e){if(e&&null!==e.match(b)){let t=e;return e.match(b).forEach(e=>{const i=`<span>${e.substr(2,e.length-4)}</span>`;t=t.replace(e,i)}),t}return e}(t),t=function(e){if(e&&null!==e.match(v)){let t=e;return e.match(v).forEach(e=>{const i=`<a href="${e}">${e}</a>`;t=t.replace(e,i)}),t}return e}(t),t=(i=t)?i.replace(E,"<br><br>"):i,t}let M;try{M=n(398)}catch(e){M=null}class T{static resolveMessage(e){if("function"==typeof e)try{return e()}catch(e){return`[LOGGER_MESSAGE_FACTORY_ERROR] ${e instanceof Error?e.message:String(e)}`}return e}static outputChannel=null;static CONFIG_CACHE_TTL_MS=1e3;static logConfigCache=null;static debugConfigCache=null;static getOutputChannel(){return!T.outputChannel&&M&&(T.outputChannel=M.window.createOutputChannel("IMDE")),T.outputChannel}static getLogConfig(){const e=Date.now();if(T.logConfigCache&&e-T.logConfigCache.timestamp<T.CONFIG_CACHE_TTL_MS)return T.logConfigCache.value;let t;if(M){const e=M.workspace.getConfiguration("imde.guiConfig.log");t={enabled:e.get("enabled",!1),levels:{info:e.get("level.info",!1),warn:e.get("level.warn",!1),error:e.get("level.error",!1),debug:e.get("level.debug",!1)}}}else t={enabled:!1,levels:{info:!1,warn:!1,error:!1,debug:!1}};return T.logConfigCache={value:t,timestamp:e},t}static getDebugConfig(){const e=Date.now();if(T.debugConfigCache&&e-T.debugConfigCache.timestamp<T.CONFIG_CACHE_TTL_MS)return T.debugConfigCache.value;let t;if(M){const e=M.workspace.getConfiguration("imde.guiConfig.debug");t={enabled:e.get("enabled",!1),parser:e.get("parser",!1),visibility:e.get("visibility",!1),menu:e.get("menu",!1),select:e.get("select",!1),source:e.get("source",!1)}}else t={enabled:!1,parser:!1,visibility:!1,menu:!1,select:!1,source:!1};return T.debugConfigCache={value:t,timestamp:e},t}static debugLog(e,t,i){if(!T.getDebugConfig().enabled)return;if(!i)return;const s=`[${(new Date).toISOString()}] [DEBUG:${e}] ${T.resolveMessage(t)}`,n=T.getOutputChannel();n&&n.appendLine(s)}static info(e){const t=T.getLogConfig();if(!t.enabled||!t.levels.info)return;const i=`[${(new Date).toISOString()}] [INFO] ${T.resolveMessage(e)}`,s=T.getOutputChannel();s&&s.appendLine(i)}static warn(e){const t=T.getLogConfig();if(!t.enabled||!t.levels.warn)return;const i=`[${(new Date).toISOString()}] [WARN] ${T.resolveMessage(e)}`,s=T.getOutputChannel();s&&s.appendLine(i)}static error(e,t,i){const s=(new Date).toISOString();let n=`[${s}] [ERROR] ${e}`;i&&(n+=` (Context: ${i})`);const r=T.getOutputChannel();if(r&&r.appendLine(n),t){const e=`[${s}] [ERROR] Stack trace: ${t.stack||t.message}`;r&&r.appendLine(e)}}static debug(e){const t=T.getLogConfig();if(!t.enabled||!t.levels.debug)return;const i=`[${(new Date).toISOString()}] [DEBUG] ${T.resolveMessage(e)}`,s=T.getOutputChannel();s&&s.appendLine(i)}static debugParser(e){const t=T.getDebugConfig();T.debugLog("PARSER",e,t.parser)}static debugVisibility(e){const t=T.getDebugConfig();T.debugLog("VISIBILITY",e,t.visibility)}static debugMenu(e){const t=T.getDebugConfig();T.debugLog("MENU",e,t.menu)}static debugSelect(e){const t=T.getDebugConfig();T.debugLog("SELECT",e,t.select)}static debugSource(e){const t=T.getDebugConfig();T.debugLog("SOURCE",e,t.source)}static debugWriter(e){const t=T.getDebugConfig();T.debugLog("WRITER",e,t.enabled)}static show(){const e=T.getOutputChannel();e&&e.show()}static dispose(){T.outputChannel&&(T.outputChannel.dispose(),T.outputChannel=null),T.logConfigCache=null,T.debugConfigCache=null}}const O=(e,t,i)=>{const s=e instanceof RegExp?k(e,i):e,n=t instanceof RegExp?k(t,i):t,r=null!==s&&null!=n&&R(s,n,i);return r&&{start:r[0],end:r[1],pre:i.slice(0,r[0]),body:i.slice(r[0]+s.length,r[1]),post:i.slice(r[1]+n.length)}},k=(e,t)=>{const i=t.match(e);return i?i[0]:null},R=(e,t,i)=>{let s,n,r,o,a,l=i.indexOf(e),h=i.indexOf(t,l+1),c=l;if(l>=0&&h>0){if(e===t)return[l,h];for(s=[],r=i.length;c>=0&&!a;){if(c===l)s.push(c),l=i.indexOf(e,c+1);else if(1===s.length){const e=s.pop();void 0!==e&&(a=[e,h])}else n=s.pop(),void 0!==n&&n<r&&(r=n,o=h),h=i.indexOf(t,c+1);c=l<h&&l>=0?l:h}s.length&&void 0!==o&&(a=[r,o])}return a},I="\0SLASH"+Math.random()+"\0",P="\0OPEN"+Math.random()+"\0",_="\0CLOSE"+Math.random()+"\0",A="\0COMMA"+Math.random()+"\0",$="\0PERIOD"+Math.random()+"\0",D=new RegExp(I,"g"),N=new RegExp(P,"g"),F=new RegExp(_,"g"),L=new RegExp(A,"g"),V=new RegExp($,"g"),B=/\\\\/g,z=/\\{/g,W=/\\}/g,j=/\\,/g,U=/\\\./g,H=1e5;function G(e){return isNaN(e)?e.charCodeAt(0):parseInt(e,10)}function K(e){return e.replace(D,"\\").replace(N,"{").replace(F,"}").replace(L,",").replace(V,".")}function Y(e){if(!e)return[""];const t=[],i=O("{","}",e);if(!i)return e.split(",");const{pre:s,body:n,post:r}=i,o=s.split(",");o[o.length-1]+="{"+n+"}";const a=Y(r);return r.length&&(o[o.length-1]+=a.shift(),o.push.apply(o,a)),t.push.apply(t,o),t}function q(e,t={}){if(!e)return[];const{max:i=H}=t;return"{}"===e.slice(0,2)&&(e="\\{\\}"+e.slice(2)),ee(function(e){return e.replace(B,I).replace(z,P).replace(W,_).replace(j,A).replace(U,$)}(e),i,!0).map(K)}function Q(e){return"{"+e+"}"}function X(e){return/^-?0\d/.test(e)}function J(e,t){return e<=t}function Z(e,t){return e>=t}function ee(e,t,i){const s=[],n=O("{","}",e);if(!n)return[e];const r=n.pre,o=n.post.length?ee(n.post,t,!1):[""];if(/\$$/.test(n.pre))for(let e=0;e<o.length&&e<t;e++){const t=r+"{"+n.body+"}"+o[e];s.push(t)}else{const a=/^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(n.body),l=/^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(n.body),h=a||l,c=n.body.indexOf(",")>=0;if(!h&&!c)return n.post.match(/,(?!,).*\}/)?ee(e=n.pre+"{"+n.body+_+n.post,t,!0):[e];let u,d;if(h)u=n.body.split(/\.\./);else if(u=Y(n.body),1===u.length&&void 0!==u[0]&&(u=ee(u[0],t,!1).map(Q),1===u.length))return o.map(e=>n.pre+u[0]+e);if(h&&void 0!==u[0]&&void 0!==u[1]){const e=G(u[0]),i=G(u[1]),s=Math.max(u[0].length,u[1].length);let n=3===u.length&&void 0!==u[2]?Math.max(Math.abs(G(u[2])),1):1,r=J;i<e&&(n*=-1,r=Z);const o=u.some(X);d=[];for(let a=e;r(a,i)&&d.length<t;a+=n){let e;if(l)e=String.fromCharCode(a),"\\"===e&&(e="");else if(e=String(a),o){const t=s-e.length;if(t>0){const i=new Array(t+1).join("0");e=a<0?"-"+i+e.slice(1):i+e}}d.push(e)}}else{d=[];for(let e=0;e<u.length;e++)d.push.apply(d,ee(u[e],t,!1))}for(let e=0;e<d.length;e++)for(let n=0;n<o.length&&s.length<t;n++){const t=r+d[e]+o[n];(!i||h||t)&&s.push(t)}}return s}const te=e=>{if("string"!=typeof e)throw new TypeError("invalid pattern");if(e.length>65536)throw new TypeError("pattern is too long")},ie={"[:alnum:]":["\\p{L}\\p{Nl}\\p{Nd}",!0],"[:alpha:]":["\\p{L}\\p{Nl}",!0],"[:ascii:]":["\\x00-\\x7f",!1],"[:blank:]":["\\p{Zs}\\t",!0],"[:cntrl:]":["\\p{Cc}",!0],"[:digit:]":["\\p{Nd}",!0],"[:graph:]":["\\p{Z}\\p{C}",!0,!0],"[:lower:]":["\\p{Ll}",!0],"[:print:]":["\\p{C}",!0],"[:punct:]":["\\p{P}",!0],"[:space:]":["\\p{Z}\\t\\r\\n\\v\\f",!0],"[:upper:]":["\\p{Lu}",!0],"[:word:]":["\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}",!0],"[:xdigit:]":["A-Fa-f0-9",!1]},se=e=>e.replace(/[[\]\\-]/g,"\\$&"),ne=e=>e.join(""),re=(e,t)=>{const i=t;if("["!==e.charAt(i))throw new Error("not in a brace expression");const s=[],n=[];let r=i+1,o=!1,a=!1,l=!1,h=!1,c=i,u="";e:for(;r<e.length;){const t=e.charAt(r);if("!"!==t&&"^"!==t||r!==i+1){if("]"===t&&o&&!l){c=r+1;break}if(o=!0,"\\"!==t||l){if("["===t&&!l)for(const[t,[o,l,h]]of Object.entries(ie))if(e.startsWith(t,r)){if(u)return["$.",!1,e.length-i,!0];r+=t.length,h?n.push(o):s.push(o),a=a||l;continue e}l=!1,u?(t>u?s.push(se(u)+"-"+se(t)):t===u&&s.push(se(t)),u="",r++):e.startsWith("-]",r+1)?(s.push(se(t+"-")),r+=2):e.startsWith("-",r+1)?(u=t,r+=2):(s.push(se(t)),r++)}else l=!0,r++}else h=!0,r++}if(c<r)return["",!1,0,!1];if(!s.length&&!n.length)return["$.",!1,e.length-i,!0];if(0===n.length&&1===s.length&&/^\\?.$/.test(s[0])&&!h){return[(d=2===s[0].length?s[0].slice(-1):s[0],d.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,"\\$&")),!1,c-i,!1]}var d;const p="["+(h?"^":"")+ne(s)+"]",f="["+(h?"":"^")+ne(n)+"]";return[s.length&&n.length?"("+p+"|"+f+")":s.length?p:f,a,c-i,!0]},oe=(e,{windowsPathsNoEscape:t=!1,magicalBraces:i=!0}={})=>i?t?e.replace(/\[([^/\\])\]/g,"$1"):e.replace(/((?!\\).|^)\[([^/\\])\]/g,"$1$2").replace(/\\([^/])/g,"$1"):t?e.replace(/\[([^/\\{}])\]/g,"$1"):e.replace(/((?!\\).|^)\[([^/\\{}])\]/g,"$1$2").replace(/\\([^/{}])/g,"$1");var ae;const le=new Set(["!","?","+","*","@"]),he=e=>le.has(e),ce=e=>he(e.type),ue=new Map([["!",["@"]],["?",["?","@"]],["@",["@"]],["*",["*","+","?","@"]],["+",["+","@"]]]),de=new Map([["!",["?"]],["@",["?"]],["+",["?","*"]]]),pe=new Map([["!",["?","@"]],["?",["?","@"]],["@",["?","@"]],["*",["*","+","?","@"]],["+",["+","@","?","*"]]]),fe=new Map([["!",new Map([["!","@"]])],["?",new Map([["*","*"],["+","*"]])],["@",new Map([["!","!"],["?","?"],["@","@"],["*","*"],["+","+"]])],["+",new Map([["?","*"],["*","*"]])]]),ge="(?!\\.)",me=new Set(["[","."]),ye=new Set(["..","."]),we=new Set("().*{}+?[]^$\\!"),ve=e=>e.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,"\\$&"),be="[^/]",Se=be+"*?",Ce=be+"+?";let Ee=0;class xe{type;#e;#t;#i=!1;#s=[];#n;#r;#o;#a=!1;#l;#h;#c=!1;id=++Ee;get depth(){return(this.#n?.depth??-1)+1}[Symbol.for("nodejs.util.inspect.custom")](){return{"@@type":"AST",id:this.id,type:this.type,root:this.#e.id,parent:this.#n?.id,depth:this.depth,partsLength:this.#s.length,parts:this.#s}}constructor(e,t,i={}){this.type=e,e&&(this.#t=!0),this.#n=t,this.#e=this.#n?this.#n.#e:this,this.#l=this.#e===this?i:this.#e.#l,this.#o=this.#e===this?[]:this.#e.#o,"!"!==e||this.#e.#a||this.#o.push(this),this.#r=this.#n?this.#n.#s.length:0}get hasMagic(){if(void 0!==this.#t)return this.#t;for(const e of this.#s)if("string"!=typeof e&&(e.type||e.hasMagic))return this.#t=!0;return this.#t}toString(){return void 0!==this.#h?this.#h:this.type?this.#h=this.type+"("+this.#s.map(e=>String(e)).join("|")+")":this.#h=this.#s.map(e=>String(e)).join("")}#u(){if(this!==this.#e)throw new Error("should only call on root");if(this.#a)return this;let e;for(this.toString(),this.#a=!0;e=this.#o.pop();){if("!"!==e.type)continue;let t=e,i=t.#n;for(;i;){for(let s=t.#r+1;!i.type&&s<i.#s.length;s++)for(const t of e.#s){if("string"==typeof t)throw new Error("string part in extglob AST??");t.copyIn(i.#s[s])}t=i,i=t.#n}}return this}push(...e){for(const t of e)if(""!==t){if("string"!=typeof t&&!(t instanceof ae&&t.#n===this))throw new Error("invalid part: "+t);this.#s.push(t)}}toJSON(){const e=null===this.type?this.#s.slice().map(e=>"string"==typeof e?e:e.toJSON()):[this.type,...this.#s.map(e=>e.toJSON())];return this.isStart()&&!this.type&&e.unshift([]),this.isEnd()&&(this===this.#e||this.#e.#a&&"!"===this.#n?.type)&&e.push({}),e}isStart(){if(this.#e===this)return!0;if(!this.#n?.isStart())return!1;if(0===this.#r)return!0;const e=this.#n;for(let t=0;t<this.#r;t++){const i=e.#s[t];if(!(i instanceof ae&&"!"===i.type))return!1}return!0}isEnd(){if(this.#e===this)return!0;if("!"===this.#n?.type)return!0;if(!this.#n?.isEnd())return!1;if(!this.type)return this.#n?.isEnd();const e=this.#n?this.#n.#s.length:0;return this.#r===e-1}copyIn(e){"string"==typeof e?this.push(e):this.push(e.clone(this))}clone(e){const t=new ae(this.type,e);for(const e of this.#s)t.copyIn(e);return t}static#d(e,t,i,s,n){const r=s.maxExtglobRecursion??2;let o=!1,a=!1,l=-1,h=!1;if(null===t.type){let c=i,u="";for(;c<e.length;){const i=e.charAt(c++);if(o||"\\"===i)o=!o,u+=i;else if(a)c===l+1?"^"!==i&&"!"!==i||(h=!0):"]"!==i||c===l+2&&h||(a=!1),u+=i;else if("["!==i){if(!s.noext&&he(i)&&"("===e.charAt(c)&&n<=r){t.push(u),u="";const r=new ae(i,t);c=ae.#d(e,r,c,s,n+1),t.push(r);continue}u+=i}else a=!0,l=c,h=!1,u+=i}return t.push(u),c}let c=i+1,u=new ae(null,t);const d=[];let p="";for(;c<e.length;){const i=e.charAt(c++);if(o||"\\"===i)o=!o,p+=i;else if(a)c===l+1?"^"!==i&&"!"!==i||(h=!0):"]"!==i||c===l+2&&h||(a=!1),p+=i;else if("["!==i){if(!s.noext&&he(i)&&"("===e.charAt(c)&&(n<=r||t&&t.#p(i))){const r=t&&t.#p(i)?0:1;u.push(p),p="";const o=new ae(i,u);u.push(o),c=ae.#d(e,o,c,s,n+r);continue}if("|"!==i){if(")"===i)return""===p&&0===t.#s.length&&(t.#c=!0),u.push(p),p="",t.push(...d,u),c;p+=i}else u.push(p),p="",d.push(u),u=new ae(null,t)}else a=!0,l=c,h=!1,p+=i}return t.type=null,t.#t=void 0,t.#s=[e.substring(i-1)],c}#f(e){return this.#g(e,de)}#g(e,t=ue){if(!e||"object"!=typeof e||null!==e.type||1!==e.#s.length||null===this.type)return!1;const i=e.#s[0];return!(!i||"object"!=typeof i||null===i.type)&&this.#p(i.type,t)}#p(e,t=pe){return!!t.get(this.type)?.includes(e)}#m(e,t){const i=e.#s[0],s=new ae(null,i,this.options);s.#s.push(""),i.push(s),this.#y(e,t)}#y(e,t){const i=e.#s[0];this.#s.splice(t,1,...i.#s);for(const e of i.#s)"object"==typeof e&&(e.#n=this);this.#h=void 0}#w(e){const t=fe.get(this.type);return!!t?.has(e)}#v(e){if(!e||"object"!=typeof e||null!==e.type||1!==e.#s.length||null===this.type||1!==this.#s.length)return!1;const t=e.#s[0];return!(!t||"object"!=typeof t||null===t.type)&&this.#w(t.type)}#b(e){const t=fe.get(this.type),i=e.#s[0],s=t?.get(i.type);if(!s)return!1;this.#s=i.#s;for(const e of this.#s)"object"==typeof e&&(e.#n=this);this.type=s,this.#h=void 0,this.#c=!1}static fromGlob(e,t={}){const i=new ae(null,void 0,t);return ae.#d(e,i,0,t,0),i}toMMPattern(){if(this!==this.#e)return this.#e.toMMPattern();const e=this.toString(),[t,i,s,n]=this.toRegExpSource();if(!(s||this.#t||this.#l.nocase&&!this.#l.nocaseMagicOnly&&e.toUpperCase()!==e.toLowerCase()))return i;const r=(this.#l.nocase?"i":"")+(n?"u":"");return Object.assign(new RegExp(`^${t}$`,r),{_src:t,_glob:e})}get options(){return this.#l}toRegExpSource(e){const t=e??!!this.#l.dot;if(this.#e===this&&(this.#S(),this.#u()),!ce(this)){const i=this.isStart()&&this.isEnd()&&!this.#s.some(e=>"string"!=typeof e),s=this.#s.map(t=>{const[s,n,r,o]="string"==typeof t?ae.#C(t,this.#t,i):t.toRegExpSource(e);return this.#t=this.#t||r,this.#i=this.#i||o,s}).join("");let n="";if(this.isStart()&&"string"==typeof this.#s[0]&&(1!==this.#s.length||!ye.has(this.#s[0]))){const i=me,r=t&&i.has(s.charAt(0))||s.startsWith("\\.")&&i.has(s.charAt(2))||s.startsWith("\\.\\.")&&i.has(s.charAt(4)),o=!t&&!e&&i.has(s.charAt(0));n=r?"(?!(?:^|/)\\.\\.?(?:$|/))":o?ge:""}let r="";return this.isEnd()&&this.#e.#a&&"!"===this.#n?.type&&(r="(?:$|\\/)"),[n+s+r,oe(s),this.#t=!!this.#t,this.#i]}const i="*"===this.type||"+"===this.type,s="!"===this.type?"(?:(?!(?:":"(?:";let n=this.#E(t);if(this.isStart()&&this.isEnd()&&!n&&"!"!==this.type){const e=this.toString(),t=this;return t.#s=[e],t.type=null,t.#t=void 0,[e,oe(this.toString()),!1,!1]}let r=!i||e||t?"":this.#E(!0);r===n&&(r=""),r&&(n=`(?:${n})(?:${r})*?`);let o="";return o="!"===this.type&&this.#c?(this.isStart()&&!t?ge:"")+Ce:s+n+("!"===this.type?"))"+(!this.isStart()||t||e?"":ge)+Se+")":"@"===this.type?")":"?"===this.type?")?":"+"===this.type&&r?")":"*"===this.type&&r?")?":`)${this.type}`),[o,oe(n),this.#t=!!this.#t,this.#i]}#S(){if(ce(this)){let e=0,t=!1;do{t=!0;for(let e=0;e<this.#s.length;e++){const i=this.#s[e];"object"==typeof i&&(i.#S(),this.#g(i)?(t=!1,this.#y(i,e)):this.#f(i)?(t=!1,this.#m(i,e)):this.#v(i)&&(t=!1,this.#b(i)))}}while(!t&&++e<10)}else for(const e of this.#s)"object"==typeof e&&e.#S();this.#h=void 0}#E(e){return this.#s.map(t=>{if("string"==typeof t)throw new Error("string type in extglob ast??");const[i,s,n,r]=t.toRegExpSource(e);return this.#i=this.#i||r,i}).filter(e=>!(this.isStart()&&this.isEnd()&&!e)).join("|")}static#C(e,t,i=!1){let s=!1,n="",r=!1,o=!1;for(let a=0;a<e.length;a++){const l=e.charAt(a);if(s)s=!1,n+=(we.has(l)?"\\":"")+l;else if("*"!==l)if(o=!1,"\\"!==l){if("["===l){const[i,s,o,l]=re(e,a);if(o){n+=i,r=r||s,a+=o-1,t=t||l;continue}}"?"!==l?n+=ve(l):(n+=be,t=!0)}else a===e.length-1?n+="\\\\":s=!0;else{if(o)continue;o=!0,n+=i&&/^[*]+$/.test(e)?Ce:Se,t=!0}}return[n,oe(e),!!t,r]}}ae=xe;const Me=(e,{windowsPathsNoEscape:t=!1,magicalBraces:i=!1}={})=>i?t?e.replace(/[?*()[\]{}]/g,"[$&]"):e.replace(/[?*()[\]\\{}]/g,"\\$&"):t?e.replace(/[?*()[\]]/g,"[$&]"):e.replace(/[?*()[\]\\]/g,"\\$&"),Te=(e,t,i={})=>(te(t),!(!i.nocomment&&"#"===t.charAt(0))&&new Je(t,i).match(e)),Oe=/^\*+([^+@!?*[(]*)$/,ke=e=>t=>!t.startsWith(".")&&t.endsWith(e),Re=e=>t=>t.endsWith(e),Ie=e=>(e=e.toLowerCase(),t=>!t.startsWith(".")&&t.toLowerCase().endsWith(e)),Pe=e=>(e=e.toLowerCase(),t=>t.toLowerCase().endsWith(e)),_e=/^\*+\.\*+$/,Ae=e=>!e.startsWith(".")&&e.includes("."),$e=e=>"."!==e&&".."!==e&&e.includes("."),De=/^\.\*+$/,Ne=e=>"."!==e&&".."!==e&&e.startsWith("."),Fe=/^\*+$/,Le=e=>0!==e.length&&!e.startsWith("."),Ve=e=>0!==e.length&&"."!==e&&".."!==e,Be=/^\?+([^+@!?*[(]*)?$/,ze=([e,t=""])=>{const i=He([e]);return t?(t=t.toLowerCase(),e=>i(e)&&e.toLowerCase().endsWith(t)):i},We=([e,t=""])=>{const i=Ge([e]);return t?(t=t.toLowerCase(),e=>i(e)&&e.toLowerCase().endsWith(t)):i},je=([e,t=""])=>{const i=Ge([e]);return t?e=>i(e)&&e.endsWith(t):i},Ue=([e,t=""])=>{const i=He([e]);return t?e=>i(e)&&e.endsWith(t):i},He=([e])=>{const t=e.length;return e=>e.length===t&&!e.startsWith(".")},Ge=([e])=>{const t=e.length;return e=>e.length===t&&"."!==e&&".."!==e},Ke="object"==typeof process&&process?"object"==typeof process.env&&process.env&&process.env.__MINIMATCH_TESTING_PLATFORM__||process.platform:"posix";Te.sep="win32"===Ke?"\\":"/";const Ye=Symbol("globstar **");Te.GLOBSTAR=Ye,Te.filter=(e,t={})=>i=>Te(i,e,t);const qe=(e,t={})=>Object.assign({},e,t);Te.defaults=e=>{if(!e||"object"!=typeof e||!Object.keys(e).length)return Te;const t=Te;return Object.assign((i,s,n={})=>t(i,s,qe(e,n)),{Minimatch:class extends t.Minimatch{constructor(t,i={}){super(t,qe(e,i))}static defaults(i){return t.defaults(qe(e,i)).Minimatch}},AST:class extends t.AST{constructor(t,i,s={}){super(t,i,qe(e,s))}static fromGlob(i,s={}){return t.AST.fromGlob(i,qe(e,s))}},unescape:(i,s={})=>t.unescape(i,qe(e,s)),escape:(i,s={})=>t.escape(i,qe(e,s)),filter:(i,s={})=>t.filter(i,qe(e,s)),defaults:i=>t.defaults(qe(e,i)),makeRe:(i,s={})=>t.makeRe(i,qe(e,s)),braceExpand:(i,s={})=>t.braceExpand(i,qe(e,s)),match:(i,s,n={})=>t.match(i,s,qe(e,n)),sep:t.sep,GLOBSTAR:Ye})};const Qe=(e,t={})=>(te(e),t.nobrace||!/\{(?:(?!\{).)*\}/.test(e)?[e]:q(e,{max:t.braceExpandMax}));Te.braceExpand=Qe,Te.makeRe=(e,t={})=>new Je(e,t).makeRe(),Te.match=(e,t,i={})=>{const s=new Je(t,i);return e=e.filter(e=>s.match(e)),s.options.nonull&&!e.length&&e.push(t),e};const Xe=/[?*]|[+@!]\(.*?\)|\[|\]/;class Je{options;set;pattern;windowsPathsNoEscape;nonegate;negate;comment;empty;preserveMultipleSlashes;partial;globSet;globParts;nocase;isWindows;platform;windowsNoMagicRoot;maxGlobstarRecursion;regexp;constructor(e,t={}){te(e),t=t||{},this.options=t,this.maxGlobstarRecursion=t.maxGlobstarRecursion??200,this.pattern=e,this.platform=t.platform||Ke,this.isWindows="win32"===this.platform,this.windowsPathsNoEscape=!!t.windowsPathsNoEscape||!1===t.allowWindowsEscape,this.windowsPathsNoEscape&&(this.pattern=this.pattern.replace(/\\/g,"/")),this.preserveMultipleSlashes=!!t.preserveMultipleSlashes,this.regexp=null,this.negate=!1,this.nonegate=!!t.nonegate,this.comment=!1,this.empty=!1,this.partial=!!t.partial,this.nocase=!!this.options.nocase,this.windowsNoMagicRoot=void 0!==t.windowsNoMagicRoot?t.windowsNoMagicRoot:!(!this.isWindows||!this.nocase),this.globSet=[],this.globParts=[],this.set=[],this.make()}hasMagic(){if(this.options.magicalBraces&&this.set.length>1)return!0;for(const e of this.set)for(const t of e)if("string"!=typeof t)return!0;return!1}debug(...e){}make(){const e=this.pattern,t=this.options;if(!t.nocomment&&"#"===e.charAt(0))return void(this.comment=!0);if(!e)return void(this.empty=!0);this.parseNegate(),this.globSet=[...new Set(this.braceExpand())],t.debug&&(this.debug=(...e)=>console.error(...e)),this.debug(this.pattern,this.globSet);const i=this.globSet.map(e=>this.slashSplit(e));this.globParts=this.preprocess(i),this.debug(this.pattern,this.globParts);let s=this.globParts.map((e,t,i)=>{if(this.isWindows&&this.windowsNoMagicRoot){const t=!(""!==e[0]||""!==e[1]||"?"!==e[2]&&Xe.test(e[2])||Xe.test(e[3])),i=/^[a-z]:/i.test(e[0]);if(t)return[...e.slice(0,4),...e.slice(4).map(e=>this.parse(e))];if(i)return[e[0],...e.slice(1).map(e=>this.parse(e))]}return e.map(e=>this.parse(e))});if(this.debug(this.pattern,s),this.set=s.filter(e=>-1===e.indexOf(!1)),this.isWindows)for(let e=0;e<this.set.length;e++){const t=this.set[e];""===t[0]&&""===t[1]&&"?"===this.globParts[e][2]&&"string"==typeof t[3]&&/^[a-z]:$/i.test(t[3])&&(t[2]="?")}this.debug(this.pattern,this.set)}preprocess(e){if(this.options.noglobstar)for(const t of e)for(let e=0;e<t.length;e++)"**"===t[e]&&(t[e]="*");const{optimizationLevel:t=1}=this.options;return t>=2?(e=this.firstPhasePreProcess(e),e=this.secondPhasePreProcess(e)):e=t>=1?this.levelOneOptimize(e):this.adjascentGlobstarOptimize(e),e}adjascentGlobstarOptimize(e){return e.map(e=>{let t=-1;for(;-1!==(t=e.indexOf("**",t+1));){let i=t;for(;"**"===e[i+1];)i++;i!==t&&e.splice(t,i-t)}return e})}levelOneOptimize(e){return e.map(e=>0===(e=e.reduce((e,t)=>{const i=e[e.length-1];return"**"===t&&"**"===i?e:".."===t&&i&&".."!==i&&"."!==i&&"**"!==i?(e.pop(),e):(e.push(t),e)},[])).length?[""]:e)}levelTwoFileOptimize(e){Array.isArray(e)||(e=this.slashSplit(e));let t=!1;do{if(t=!1,!this.preserveMultipleSlashes){for(let i=1;i<e.length-1;i++){const s=e[i];1===i&&""===s&&""===e[0]||"."!==s&&""!==s||(t=!0,e.splice(i,1),i--)}"."!==e[0]||2!==e.length||"."!==e[1]&&""!==e[1]||(t=!0,e.pop())}let i=0;for(;-1!==(i=e.indexOf("..",i+1));){const s=e[i-1];!s||"."===s||".."===s||"**"===s||this.isWindows&&/^[a-z]:$/i.test(s)||(t=!0,e.splice(i-1,2),i-=2)}}while(t);return 0===e.length?[""]:e}firstPhasePreProcess(e){let t=!1;do{t=!1;for(let i of e){let s=-1;for(;-1!==(s=i.indexOf("**",s+1));){let n=s;for(;"**"===i[n+1];)n++;n>s&&i.splice(s+1,n-s);let r=i[s+1];const o=i[s+2],a=i[s+3];if(".."!==r)continue;if(!o||"."===o||".."===o||!a||"."===a||".."===a)continue;t=!0,i.splice(s,1);const l=i.slice(0);l[s]="**",e.push(l),s--}if(!this.preserveMultipleSlashes){for(let e=1;e<i.length-1;e++){const s=i[e];1===e&&""===s&&""===i[0]||"."!==s&&""!==s||(t=!0,i.splice(e,1),e--)}"."!==i[0]||2!==i.length||"."!==i[1]&&""!==i[1]||(t=!0,i.pop())}let n=0;for(;-1!==(n=i.indexOf("..",n+1));){const e=i[n-1];if(e&&"."!==e&&".."!==e&&"**"!==e){t=!0;const e=1===n&&"**"===i[n+1]?["."]:[];i.splice(n-1,2,...e),0===i.length&&i.push(""),n-=2}}}}while(t);return e}secondPhasePreProcess(e){for(let t=0;t<e.length-1;t++)for(let i=t+1;i<e.length;i++){const s=this.partsMatch(e[t],e[i],!this.preserveMultipleSlashes);if(s){e[t]=[],e[i]=s;break}}return e.filter(e=>e.length)}partsMatch(e,t,i=!1){let s=0,n=0,r=[],o="";for(;s<e.length&&n<t.length;)if(e[s]===t[n])r.push("b"===o?t[n]:e[s]),s++,n++;else if(i&&"**"===e[s]&&t[n]===e[s+1])r.push(e[s]),s++;else if(i&&"**"===t[n]&&e[s]===t[n+1])r.push(t[n]),n++;else if("*"!==e[s]||!t[n]||!this.options.dot&&t[n].startsWith(".")||"**"===t[n]){if("*"!==t[n]||!e[s]||!this.options.dot&&e[s].startsWith(".")||"**"===e[s])return!1;if("a"===o)return!1;o="b",r.push(t[n]),s++,n++}else{if("b"===o)return!1;o="a",r.push(e[s]),s++,n++}return e.length===t.length&&r}parseNegate(){if(this.nonegate)return;const e=this.pattern;let t=!1,i=0;for(let s=0;s<e.length&&"!"===e.charAt(s);s++)t=!t,i++;i&&(this.pattern=e.slice(i)),this.negate=t}matchOne(e,t,i=!1){let s=0,n=0;if(this.isWindows){const i="string"==typeof e[0]&&/^[a-z]:$/i.test(e[0]),r=!i&&""===e[0]&&""===e[1]&&"?"===e[2]&&/^[a-z]:$/i.test(e[3]),o="string"==typeof t[0]&&/^[a-z]:$/i.test(t[0]),a=r?3:i?0:void 0,l=!o&&""===t[0]&&""===t[1]&&"?"===t[2]&&"string"==typeof t[3]&&/^[a-z]:$/i.test(t[3])?3:o?0:void 0;if("number"==typeof a&&"number"==typeof l){const[i,r]=[e[a],t[l]];i.toLowerCase()===r.toLowerCase()&&(t[l]=i,n=l,s=a)}}const{optimizationLevel:r=1}=this.options;return r>=2&&(e=this.levelTwoFileOptimize(e)),t.includes(Ye)?this.#x(e,t,i,s,n):this.#M(e,t,i,s,n)}#x(e,t,i,s,n){const r=t.indexOf(Ye,n),o=t.lastIndexOf(Ye),[a,l,h]=i?[t.slice(n,r),t.slice(r+1),[]]:[t.slice(n,r),t.slice(r+1,o),t.slice(o+1)];if(a.length){const t=e.slice(s,s+a.length);if(!this.#M(t,a,i,0,0))return!1;s+=a.length,n+=a.length}let c=0;if(h.length){if(h.length+s>e.length)return!1;let t=e.length-h.length;if(this.#M(e,h,i,t,0))c=h.length;else{if(""!==e[e.length-1]||s+h.length===e.length)return!1;if(t--,!this.#M(e,h,i,t,0))return!1;c=h.length+1}}if(!l.length){let t=!!c;for(let i=s;i<e.length-c;i++){const s=String(e[i]);if(t=!0,"."===s||".."===s||!this.options.dot&&s.startsWith("."))return!1}return i||t}const u=[[[],0]];let d=u[0],p=0;const f=[0];for(const e of l)e===Ye?(f.push(p),d=[[],0],u.push(d)):(d[0].push(e),p++);let g=u.length-1;const m=e.length-c;for(const e of u)e[1]=m-(f[g--]+e[0].length);return!!this.#T(e,u,s,0,i,0,!!c)}#T(e,t,i,s,n,r,o){const a=t[s];if(!a){for(let t=i;t<e.length;t++){o=!0;const i=e[t];if("."===i||".."===i||!this.options.dot&&i.startsWith("."))return!1}return o}const[l,h]=a;for(;i<=h;){if(this.#M(e.slice(0,i+l.length),l,n,i,0)&&r<this.maxGlobstarRecursion){const a=this.#T(e,t,i+l.length,s+1,n,r+1,o);if(!1!==a)return a}const a=e[i];if("."===a||".."===a||!this.options.dot&&a.startsWith("."))return!1;i++}return n||null}#M(e,t,i,s,n){let r,o,a,l;for(r=s,o=n,l=e.length,a=t.length;r<l&&o<a;r++,o++){this.debug("matchOne loop");let i,s=t[o],n=e[r];if(this.debug(t,s,n),!1===s||s===Ye)return!1;if("string"==typeof s?(i=n===s,this.debug("string match",s,n,i)):(i=s.test(n),this.debug("pattern match",s,n,i)),!i)return!1}if(r===l&&o===a)return!0;if(r===l)return i;if(o===a)return r===l-1&&""===e[r];throw new Error("wtf?")}braceExpand(){return Qe(this.pattern,this.options)}parse(e){te(e);const t=this.options;if("**"===e)return Ye;if(""===e)return"";let i,s=null;(i=e.match(Fe))?s=t.dot?Ve:Le:(i=e.match(Oe))?s=(t.nocase?t.dot?Pe:Ie:t.dot?Re:ke)(i[1]):(i=e.match(Be))?s=(t.nocase?t.dot?We:ze:t.dot?je:Ue)(i):(i=e.match(_e))?s=t.dot?$e:Ae:(i=e.match(De))&&(s=Ne);const n=xe.fromGlob(e,this.options).toMMPattern();return s&&"object"==typeof n&&Reflect.defineProperty(n,"test",{value:s}),n}makeRe(){if(this.regexp||!1===this.regexp)return this.regexp;const e=this.set;if(!e.length)return this.regexp=!1,this.regexp;const t=this.options,i=t.noglobstar?"[^/]*?":t.dot?"(?:(?!(?:\\/|^)(?:\\.{1,2})($|\\/)).)*?":"(?:(?!(?:\\/|^)\\.).)*?",s=new Set(t.nocase?["i"]:[]);let n=e.map(e=>{const t=e.map(e=>{if(e instanceof RegExp)for(const t of e.flags.split(""))s.add(t);return"string"==typeof e?e.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,"\\$&"):e===Ye?Ye:e._src});t.forEach((e,s)=>{const n=t[s+1],r=t[s-1];e===Ye&&r!==Ye&&(void 0===r?void 0!==n&&n!==Ye?t[s+1]="(?:\\/|"+i+"\\/)?"+n:t[s]=i:void 0===n?t[s-1]=r+"(?:\\/|\\/"+i+")?":n!==Ye&&(t[s-1]=r+"(?:\\/|\\/"+i+"\\/)"+n,t[s+1]=Ye))});const n=t.filter(e=>e!==Ye);if(this.partial&&n.length>=1){const e=[];for(let t=1;t<=n.length;t++)e.push(n.slice(0,t).join("/"));return"(?:"+e.join("|")+")"}return n.join("/")}).join("|");const[r,o]=e.length>1?["(?:",")"]:["",""];n="^"+r+n+o+"$",this.partial&&(n="^(?:\\/|"+r+n.slice(1,-1)+o+")$"),this.negate&&(n="^(?!"+n+").+$");try{this.regexp=new RegExp(n,[...s].join(""))}catch{this.regexp=!1}return this.regexp}slashSplit(e){return this.preserveMultipleSlashes?e.split("/"):this.isWindows&&/^\/\/[^/]+/.test(e)?["",...e.split(/\/+/)]:e.split(/\/+/)}match(e,t=this.partial){if(this.debug("match",e,this.pattern),this.comment)return!1;if(this.empty)return""===e;if("/"===e&&t)return!0;const i=this.options;this.isWindows&&(e=e.split("\\").join("/"));const s=this.slashSplit(e);this.debug(this.pattern,"split",s);const n=this.set;this.debug(this.pattern,"set",n);let r=s[s.length-1];if(!r)for(let e=s.length-2;!r&&e>=0;e--)r=s[e];for(const e of n){let n=s;if(i.matchBase&&1===e.length&&(n=[r]),this.matchOne(n,e,t))return!!i.flipNegate||!this.negate}return!i.flipNegate&&this.negate}static defaults(e){return Te.defaults(e).Minimatch}}Te.AST=xe,Te.Minimatch=Je,Te.escape=Me,Te.unescape=oe;const Ze=require("node:url"),et=require("node:diagnostics_channel");var tt=(0,et.channel)("lru-cache:metrics"),it=(0,et.tracingChannel)("lru-cache"),st="object"==typeof performance&&performance&&"function"==typeof performance.now?performance:Date,nt=()=>tt.hasSubscribers||it.hasSubscribers,rt=new Set,ot="object"==typeof process&&process?process:{},at=e=>!!e&&e===Math.floor(e)&&e>0&&isFinite(e),lt=e=>at(e)?e<=Math.pow(2,8)?Uint8Array:e<=Math.pow(2,16)?Uint16Array:e<=Math.pow(2,32)?Uint32Array:e<=Number.MAX_SAFE_INTEGER?ht:null:null,ht=class extends Array{constructor(e){super(e),this.fill(0)}},ct=class e{heap;length;static#O=!1;static create(t){let i=lt(t);if(!i)return[];e.#O=!0;let s=new e(t,i);return e.#O=!1,s}constructor(t,i){if(!e.#O)throw new TypeError("instantiate Stack using Stack.create(n)");this.heap=new i(t),this.length=0}push(e){this.heap[this.length++]=e}pop(){return this.heap[--this.length]}},ut=class e{#O;#k;#R;#I;#P;#_;#A;#$;get perf(){return this.#$}ttl;ttlResolution;ttlAutopurge;updateAgeOnGet;updateAgeOnHas;allowStale;noDisposeOnSet;noUpdateTTL;maxEntrySize;sizeCalculation;noDeleteOnFetchRejection;noDeleteOnStaleGet;allowStaleOnFetchAbort;allowStaleOnFetchRejection;ignoreFetchAbort;backgroundFetchSize;#D;#N;#F;#L;#V;#B;#z;#W;#j;#U;#H;#G;#K;#Y;#q;#Q;#X;#J;#Z;static unsafeExposeInternals(e){return{starts:e.#K,ttls:e.#Y,autopurgeTimers:e.#q,sizes:e.#G,keyMap:e.#F,keyList:e.#L,valList:e.#V,next:e.#B,prev:e.#z,get head(){return e.#W},get tail(){return e.#j},free:e.#U,isBackgroundFetch:t=>e.#ee(t),backgroundFetch:(t,i,s,n)=>e.#te(t,i,s,n),moveToTail:t=>e.#ie(t),indexes:t=>e.#se(t),rindexes:t=>e.#ne(t),isStale:t=>e.#re(t)}}get max(){return this.#O}get maxSize(){return this.#k}get calculatedSize(){return this.#N}get size(){return this.#D}get fetchMethod(){return this.#_}get memoMethod(){return this.#A}get dispose(){return this.#R}get onInsert(){return this.#I}get disposeAfter(){return this.#P}constructor(t){let{max:i=0,ttl:s,ttlResolution:n=1,ttlAutopurge:r,updateAgeOnGet:o,updateAgeOnHas:a,allowStale:l,dispose:h,onInsert:c,disposeAfter:u,noDisposeOnSet:d,noUpdateTTL:p,maxSize:f=0,maxEntrySize:g=0,sizeCalculation:m,fetchMethod:y,memoMethod:w,noDeleteOnFetchRejection:v,noDeleteOnStaleGet:b,allowStaleOnFetchRejection:S,allowStaleOnFetchAbort:C,ignoreFetchAbort:E,backgroundFetchSize:x=1,perf:M}=t;if(this.backgroundFetchSize=x,void 0!==M&&"function"!=typeof M?.now)throw new TypeError("perf option must have a now() method if specified");if(this.#$=M??st,0!==i&&!at(i))throw new TypeError("max option must be a nonnegative integer");let T=i?lt(i):Array;if(!T)throw new Error("invalid max value: "+i);if(this.#O=i,this.#k=f,this.maxEntrySize=g||this.#k,this.sizeCalculation=m,this.sizeCalculation){if(!this.#k&&!this.maxEntrySize)throw new TypeError("cannot set sizeCalculation without setting maxSize or maxEntrySize");if("function"!=typeof this.sizeCalculation)throw new TypeError("sizeCalculation set to non-function")}if(void 0!==w&&"function"!=typeof w)throw new TypeError("memoMethod must be a function if defined");if(this.#A=w,void 0!==y&&"function"!=typeof y)throw new TypeError("fetchMethod must be a function if specified");if(this.#_=y,this.#X=!!y,this.#F=new Map,this.#L=Array.from({length:i}).fill(void 0),this.#V=Array.from({length:i}).fill(void 0),this.#B=new T(i),this.#z=new T(i),this.#W=0,this.#j=0,this.#U=ct.create(i),this.#D=0,this.#N=0,"function"==typeof h&&(this.#R=h),"function"==typeof c&&(this.#I=c),"function"==typeof u?(this.#P=u,this.#H=[]):(this.#P=void 0,this.#H=void 0),this.#Q=!!this.#R,this.#Z=!!this.#I,this.#J=!!this.#P,this.noDisposeOnSet=!!d,this.noUpdateTTL=!!p,this.noDeleteOnFetchRejection=!!v,this.allowStaleOnFetchRejection=!!S,this.allowStaleOnFetchAbort=!!C,this.ignoreFetchAbort=!!E,0!==this.maxEntrySize){if(0!==this.#k&&!at(this.#k))throw new TypeError("maxSize must be a positive integer if specified");if(!at(this.maxEntrySize))throw new TypeError("maxEntrySize must be a positive integer if specified");this.#oe()}if(this.allowStale=!!l,this.noDeleteOnStaleGet=!!b,this.updateAgeOnGet=!!o,this.updateAgeOnHas=!!a,this.ttlResolution=at(n)||0===n?n:1,this.ttlAutopurge=!!r,this.ttl=s||0,this.ttl){if(!at(this.ttl))throw new TypeError("ttl must be a positive integer if specified");this.#ae()}if(0===this.#O&&0===this.ttl&&0===this.#k)throw new TypeError("At least one of max, maxSize, or ttl is required");if(!this.ttlAutopurge&&!this.#O&&!this.#k){let t="LRU_CACHE_UNBOUNDED";(e=>!rt.has(e))(t)&&(rt.add(t),((e,t,i,s)=>{"function"==typeof ot.emitWarning?ot.emitWarning(e,t,i,s):console.error(`[${i}] ${t}: ${e}`)})("TTL caching without ttlAutopurge, max, or maxSize can result in unbounded memory consumption.","UnboundedCacheWarning",t,e))}}getRemainingTTL(e){return this.#F.has(e)?1/0:0}#ae(){let e=new ht(this.#O),t=new ht(this.#O);this.#Y=e,this.#K=t;let i=this.ttlAutopurge?Array.from({length:this.#O}):void 0;this.#q=i,this.#le=(i,n,r=this.#$.now())=>{t[i]=0!==n?r:0,e[i]=n,s(i,n)},this.#he=i=>{t[i]=0!==e[i]?this.#$.now():0,s(i,e[i])};let s=this.ttlAutopurge?(e,t)=>{if(i?.[e]&&(clearTimeout(i[e]),i[e]=void 0),t&&0!==t&&i){let s=setTimeout(()=>{this.#re(e)&&this.#ce(this.#L[e],"expire")},t+1);s.unref&&s.unref(),i[e]=s}}:()=>{};this.#ue=(i,s)=>{if(e[s]){let o=e[s],a=t[s];if(!o||!a)return;i.ttl=o,i.start=a,i.now=n||r();let l=i.now-a;i.remainingTTL=o-l}};let n=0,r=()=>{let e=this.#$.now();if(this.ttlResolution>0){n=e;let t=setTimeout(()=>n=0,this.ttlResolution);t.unref&&t.unref()}return e};this.getRemainingTTL=i=>{let s=this.#F.get(i);if(void 0===s)return 0;let o=e[s],a=t[s];return o&&a?o-((n||r())-a):1/0},this.#re=i=>{let s=t[i],o=e[i];return!!o&&!!s&&(n||r())-s>o}}#he=()=>{};#ue=()=>{};#le=()=>{};#re=()=>!1;#oe(){let e=new ht(this.#O);this.#N=0,this.#G=e,this.#de=t=>{this.#N-=e[t],e[t]=0},this.#pe=(e,t,i,s)=>{if(!at(i)){if(this.#ee(t))return this.backgroundFetchSize;if(!s)throw new TypeError("invalid size value (must be positive integer). When maxSize or maxEntrySize is used, sizeCalculation or size must be set.");if("function"!=typeof s)throw new TypeError("sizeCalculation must be a function");if(i=s(t,e),!at(i))throw new TypeError("sizeCalculation return invalid (expect positive integer)")}return i},this.#fe=(t,i,s)=>{if(e[t]=i,this.#k){let i=this.#k-e[t];for(;this.#N>i;)this.#ge(!0)}this.#N+=e[t],s&&(s.entrySize=i,s.totalCalculatedSize=this.#N)}}#de=e=>{};#fe=(e,t,i)=>{};#pe=(e,t,i,s)=>{if(i||s)throw new TypeError("cannot set size without setting maxSize or maxEntrySize on cache");return 0};*#se({allowStale:e=this.allowStale}={}){if(this.#D)for(let t=this.#j;this.#me(t)&&((e||!this.#re(t))&&(yield t),t!==this.#W);)t=this.#z[t]}*#ne({allowStale:e=this.allowStale}={}){if(this.#D)for(let t=this.#W;this.#me(t)&&((e||!this.#re(t))&&(yield t),t!==this.#j);)t=this.#B[t]}#me(e){return void 0!==e&&this.#F.get(this.#L[e])===e}*entries(){for(let e of this.#se())void 0!==this.#V[e]&&void 0!==this.#L[e]&&!this.#ee(this.#V[e])&&(yield[this.#L[e],this.#V[e]])}*rentries(){for(let e of this.#ne())void 0!==this.#V[e]&&void 0!==this.#L[e]&&!this.#ee(this.#V[e])&&(yield[this.#L[e],this.#V[e]])}*keys(){for(let e of this.#se()){let t=this.#L[e];void 0!==t&&!this.#ee(this.#V[e])&&(yield t)}}*rkeys(){for(let e of this.#ne()){let t=this.#L[e];void 0!==t&&!this.#ee(this.#V[e])&&(yield t)}}*values(){for(let e of this.#se())void 0!==this.#V[e]&&!this.#ee(this.#V[e])&&(yield this.#V[e])}*rvalues(){for(let e of this.#ne())void 0!==this.#V[e]&&!this.#ee(this.#V[e])&&(yield this.#V[e])}[Symbol.iterator](){return this.entries()}[Symbol.toStringTag]="LRUCache";find(e,t={}){for(let i of this.#se()){let s=this.#V[i],n=this.#ee(s)?s.__staleWhileFetching:s;if(void 0!==n&&e(n,this.#L[i],this))return this.#ye(this.#L[i],t)}}forEach(e,t=this){for(let i of this.#se()){let s=this.#V[i],n=this.#ee(s)?s.__staleWhileFetching:s;void 0!==n&&e.call(t,n,this.#L[i],this)}}rforEach(e,t=this){for(let i of this.#ne()){let s=this.#V[i],n=this.#ee(s)?s.__staleWhileFetching:s;void 0!==n&&e.call(t,n,this.#L[i],this)}}purgeStale(){let e=!1;for(let t of this.#ne({allowStale:!0}))this.#re(t)&&(this.#ce(this.#L[t],"expire"),e=!0);return e}info(e){let t=this.#F.get(e);if(void 0===t)return;let i=this.#V[t],s=this.#ee(i)?i.__staleWhileFetching:i;if(void 0===s)return;let n={value:s};if(this.#Y&&this.#K){let e=this.#Y[t],i=this.#K[t];if(e&&i){let t=e-(this.#$.now()-i);n.ttl=t,n.start=Date.now()}}return this.#G&&(n.size=this.#G[t]),n}dump(){let e=[];for(let t of this.#se({allowStale:!0})){let i=this.#L[t],s=this.#V[t],n=this.#ee(s)?s.__staleWhileFetching:s;if(void 0===n||void 0===i)continue;let r={value:n};if(this.#Y&&this.#K){r.ttl=this.#Y[t];let e=this.#$.now()-this.#K[t];r.start=Math.floor(Date.now()-e)}this.#G&&(r.size=this.#G[t]),e.unshift([i,r])}return e}load(e){this.clear();for(let[t,i]of e){if(i.start){let e=Date.now()-i.start;i.start=this.#$.now()-e}this.#we(t,i.value,i)}}set(e,t,i={}){let{status:s=(tt.hasSubscribers?{}:void 0)}=i;i.status=s,s&&(s.op="set",s.key=e,void 0!==t&&(s.value=t),s.cache=this);let n=this.#we(e,t,i);return s&&tt.hasSubscribers&&tt.publish(s),n}#we(e,t,i,s){let{ttl:n=this.ttl,start:r,noDisposeOnSet:o=this.noDisposeOnSet,sizeCalculation:a=this.sizeCalculation,status:l}=i,h=this.#ee(t);if(void 0===t)return l&&(l.set="deleted"),this.delete(e),this;let{noUpdateTTL:c=this.noUpdateTTL}=i;l&&!h&&(l.value=t);let u=this.#pe(e,t,i.size||0,a,l);if(this.maxEntrySize&&u>this.maxEntrySize)return this.#ce(e,"set"),l&&(l.set="miss",l.maxEntrySizeExceeded=!0),this;let d=0===this.#D?void 0:this.#F.get(e);if(void 0===d)d=0===this.#D?this.#j:0!==this.#U.length?this.#U.pop():this.#D===this.#O?this.#ge(!1):this.#D,this.#L[d]=e,this.#V[d]=t,this.#F.set(e,d),this.#B[this.#j]=d,this.#z[d]=this.#j,this.#j=d,this.#D++,this.#fe(d,u,l),l&&(l.set="add"),c=!1,this.#Z&&!h&&this.#I?.(t,e,"add");else{this.#ie(d);let i=this.#V[d];if(t!==i){if(!o)if(this.#ee(i)){i!==s&&i.__abortController.abort(new Error("replaced"));let{__staleWhileFetching:n}=i;void 0!==n&&n!==t&&(this.#Q&&this.#R?.(n,e,"set"),this.#J&&this.#H?.push([n,e,"set"]))}else this.#Q&&this.#R?.(i,e,"set"),this.#J&&this.#H?.push([i,e,"set"]);if(this.#de(d),this.#fe(d,u,l),this.#V[d]=t,!h){let s=i&&this.#ee(i)?i.__staleWhileFetching:i,n=void 0===s?"add":t!==s?"replace":"update";l&&(l.set=n,void 0!==s&&(l.oldValue=s)),this.#Z&&this.onInsert?.(t,e,n)}}else h||(l&&(l.set="update"),this.#Z&&this.onInsert?.(t,e,"update"))}if(0!==n&&!this.#Y&&this.#ae(),this.#Y&&(c||this.#le(d,n,r),l&&this.#ue(l,d)),!o&&this.#J&&this.#H){let e,t=this.#H;for(;e=t?.shift();)this.#P?.(...e)}return this}pop(){try{for(;this.#D;){let e=this.#V[this.#W];if(this.#ge(!0),this.#ee(e)){if(e.__staleWhileFetching)return e.__staleWhileFetching}else if(void 0!==e)return e}}finally{if(this.#J&&this.#H){let e,t=this.#H;for(;e=t?.shift();)this.#P?.(...e)}}}#ge(e){let t=this.#W,i=this.#L[t],s=this.#V[t],n=this.#ee(s);n&&s.__abortController.abort(new Error("evicted"));let r=n?s.__staleWhileFetching:s;return(this.#Q||this.#J)&&void 0!==r&&(this.#Q&&this.#R?.(r,i,"evict"),this.#J&&this.#H?.push([r,i,"evict"])),this.#de(t),this.#q?.[t]&&(clearTimeout(this.#q[t]),this.#q[t]=void 0),e&&(this.#L[t]=void 0,this.#V[t]=void 0,this.#U.push(t)),1===this.#D?(this.#W=this.#j=0,this.#U.length=0):this.#W=this.#B[t],this.#F.delete(i),this.#D--,t}has(e,t={}){let{status:i=(tt.hasSubscribers?{}:void 0)}=t;t.status=i,i&&(i.op="has",i.key=e,i.cache=this);let s=this.#ve(e,t);return tt.hasSubscribers&&tt.publish(i),s}#ve(e,t={}){let{updateAgeOnHas:i=this.updateAgeOnHas,status:s}=t,n=this.#F.get(e);if(void 0!==n){let e=this.#V[n];if(this.#ee(e)&&void 0===e.__staleWhileFetching)return!1;if(!this.#re(n))return i&&this.#he(n),s&&(s.has="hit",this.#ue(s,n)),!0;s&&(s.has="stale",this.#ue(s,n))}else s&&(s.has="miss");return!1}peek(e,t={}){let{status:i=(nt()?{}:void 0)}=t;i&&(i.op="peek",i.key=e,i.cache=this),t.status=i;let s=this.#be(e,t);return tt.hasSubscribers&&tt.publish(i),s}#be(e,t){let{status:i,allowStale:s=this.allowStale}=t,n=this.#F.get(e);if(void 0===n||!s&&this.#re(n))return void(i&&(i.peek=void 0===n?"miss":"stale"));let r=this.#V[n],o=this.#ee(r)?r.__staleWhileFetching:r;return i&&(void 0!==o?(i.peek="hit",i.value=o):i.peek="miss"),o}#te(e,t,i,s){let n=void 0===t?void 0:this.#V[t];if(this.#ee(n))return n;let r=new AbortController,{signal:o}=i;o?.addEventListener("abort",()=>r.abort(o.reason),{signal:r.signal});let a={signal:r.signal,options:i,context:s},l=(s,n=!1)=>{let{aborted:o}=r.signal,l=i.ignoreFetchAbort&&void 0!==s,u=i.ignoreFetchAbort||!(!i.allowStaleOnFetchAbort||void 0===s);if(i.status&&(o&&!n?(i.status.fetchAborted=!0,i.status.fetchError=r.signal.reason,l&&(i.status.fetchAbortIgnored=!0)):i.status.fetchResolved=!0),o&&!l&&!n)return h(r.signal.reason,u);let d=c,p=this.#V[t];return(p===c||void 0===p&&l&&n)&&(void 0===s?void 0!==d.__staleWhileFetching?this.#V[t]=d.__staleWhileFetching:this.#ce(e,"fetch"):(i.status&&(i.status.fetchUpdated=!0),this.#we(e,s,a.options,d))),s},h=(s,n)=>{let{aborted:o}=r.signal,a=o&&i.allowStaleOnFetchAbort,l=a||i.allowStaleOnFetchRejection,h=l||i.noDeleteOnFetchRejection,u=c;if(this.#V[t]===c&&(!h||!n&&void 0===u.__staleWhileFetching?this.#ce(e,"fetch"):a||(this.#V[t]=u.__staleWhileFetching)),l)return i.status&&void 0!==u.__staleWhileFetching&&(i.status.returnedStale=!0),u.__staleWhileFetching;if(u.__returned===u)throw s};i.status&&(i.status.fetchDispatched=!0);let c=new Promise((t,s)=>{let o=this.#_?.(e,n,a);r.signal.addEventListener("abort",()=>{(!i.ignoreFetchAbort||i.allowStaleOnFetchAbort)&&(t(void 0),i.allowStaleOnFetchAbort&&(t=e=>l(e,!0)))}),o&&o instanceof Promise?o.then(e=>t(void 0===e?void 0:e),s):void 0!==o&&t(o)}).then(l,e=>(i.status&&(i.status.fetchRejected=!0,i.status.fetchError=e),h(e,!1))),u=Object.assign(c,{__abortController:r,__staleWhileFetching:n,__returned:void 0});return void 0===t?(this.#we(e,u,{...a.options,status:void 0}),t=this.#F.get(e)):this.#V[t]=u,u}#ee(e){if(!this.#X)return!1;let t=e;return!!t&&t instanceof Promise&&t.hasOwnProperty("__staleWhileFetching")&&t.__abortController instanceof AbortController}fetch(e,t={}){let i=it.hasSubscribers,{status:s=(nt()?{}:void 0)}=t;t.status=s,s&&t.context&&(s.context=t.context);let n=this.#Se(e,t);return s&&i&&(s.trace=!0,it.tracePromise(()=>n,s).catch(()=>{})),n}async#Se(e,t={}){let{allowStale:i=this.allowStale,updateAgeOnGet:s=this.updateAgeOnGet,noDeleteOnStaleGet:n=this.noDeleteOnStaleGet,ttl:r=this.ttl,noDisposeOnSet:o=this.noDisposeOnSet,size:a=0,sizeCalculation:l=this.sizeCalculation,noUpdateTTL:h=this.noUpdateTTL,noDeleteOnFetchRejection:c=this.noDeleteOnFetchRejection,allowStaleOnFetchRejection:u=this.allowStaleOnFetchRejection,ignoreFetchAbort:d=this.ignoreFetchAbort,allowStaleOnFetchAbort:p=this.allowStaleOnFetchAbort,context:f,forceRefresh:g=!1,status:m,signal:y}=t;if(m&&(m.op="fetch",m.key=e,g&&(m.forceRefresh=!0),m.cache=this),!this.#X)return m&&(m.fetch="get"),this.#ye(e,{allowStale:i,updateAgeOnGet:s,noDeleteOnStaleGet:n,status:m});let w={allowStale:i,updateAgeOnGet:s,noDeleteOnStaleGet:n,ttl:r,noDisposeOnSet:o,size:a,sizeCalculation:l,noUpdateTTL:h,noDeleteOnFetchRejection:c,allowStaleOnFetchRejection:u,allowStaleOnFetchAbort:p,ignoreFetchAbort:d,status:m,signal:y},v=this.#F.get(e);if(void 0===v){m&&(m.fetch="miss");let t=this.#te(e,v,w,f);return t.__returned=t}{let t=this.#V[v];if(this.#ee(t)){let e=i&&void 0!==t.__staleWhileFetching;return m&&(m.fetch="inflight",e&&(m.returnedStale=!0)),e?t.__staleWhileFetching:t.__returned=t}let n=this.#re(v);if(!g&&!n)return m&&(m.fetch="hit"),this.#ie(v),s&&this.#he(v),m&&this.#ue(m,v),t;let r=this.#te(e,v,w,f),o=void 0!==r.__staleWhileFetching&&i;return m&&(m.fetch=n?"stale":"refresh",o&&n&&(m.returnedStale=!0)),o?r.__staleWhileFetching:r.__returned=r}}forceFetch(e,t={}){let i=it.hasSubscribers,{status:s=(nt()?{}:void 0)}=t;t.status=s,s&&t.context&&(s.context=t.context);let n=this.#Ce(e,t);return s&&i&&(s.trace=!0,it.tracePromise(()=>n,s).catch(()=>{})),n}async#Ce(e,t={}){let i=await this.#Se(e,t);if(void 0===i)throw new Error("fetch() returned undefined");return i}memo(e,t={}){let{status:i=(tt.hasSubscribers?{}:void 0)}=t;t.status=i,i&&(i.op="memo",i.key=e,t.context&&(i.context=t.context),i.cache=this);let s=this.#Ee(e,t);return i&&(i.value=s),tt.hasSubscribers&&tt.publish(i),s}#Ee(e,t={}){let i=this.#A;if(!i)throw new Error("no memoMethod provided to constructor");let{context:s,status:n,forceRefresh:r,...o}=t;n&&r&&(n.forceRefresh=!0);let a=this.#ye(e,o),l=r||void 0===a;if(n&&(n.memo=l?"miss":"hit",l||(n.value=a)),!l)return a;let h=i(e,a,{options:o,context:s});return n&&(n.value=h),this.#we(e,h,o),h}get(e,t={}){let{status:i=(tt.hasSubscribers?{}:void 0)}=t;t.status=i,i&&(i.op="get",i.key=e,i.cache=this);let s=this.#ye(e,t);return i&&(void 0!==s&&(i.value=s),tt.hasSubscribers&&tt.publish(i)),s}#ye(e,t={}){let{allowStale:i=this.allowStale,updateAgeOnGet:s=this.updateAgeOnGet,noDeleteOnStaleGet:n=this.noDeleteOnStaleGet,status:r}=t,o=this.#F.get(e);if(void 0===o)return void(r&&(r.get="miss"));let a=this.#V[o],l=this.#ee(a);return r&&this.#ue(r,o),this.#re(o)?l?(r&&(r.get="stale-fetching"),i&&void 0!==a.__staleWhileFetching?(r&&(r.returnedStale=!0),a.__staleWhileFetching):void 0):(n||this.#ce(e,"expire"),r&&(r.get="stale"),i?(r&&(r.returnedStale=!0),a):void 0):(r&&(r.get=l?"fetching":"hit"),this.#ie(o),s&&this.#he(o),l?a.__staleWhileFetching:a)}#xe(e,t){this.#z[t]=e,this.#B[e]=t}#ie(e){e!==this.#j&&(e===this.#W?this.#W=this.#B[e]:this.#xe(this.#z[e],this.#B[e]),this.#xe(this.#j,e),this.#j=e)}delete(e){return this.#ce(e,"delete")}#ce(e,t){tt.hasSubscribers&&tt.publish({op:"delete",delete:t,key:e,cache:this});let i=!1;if(0!==this.#D){let s=this.#F.get(e);if(void 0!==s)if(this.#q?.[s]&&(clearTimeout(this.#q?.[s]),this.#q[s]=void 0),i=!0,1===this.#D)this.#Me(t);else{this.#de(s);let i=this.#V[s];if(this.#ee(i)?i.__abortController.abort(new Error("deleted")):(this.#Q||this.#J)&&(this.#Q&&this.#R?.(i,e,t),this.#J&&this.#H?.push([i,e,t])),this.#F.delete(e),this.#L[s]=void 0,this.#V[s]=void 0,s===this.#j)this.#j=this.#z[s];else if(s===this.#W)this.#W=this.#B[s];else{let e=this.#z[s];this.#B[e]=this.#B[s];let t=this.#B[s];this.#z[t]=this.#z[s]}this.#D--,this.#U.push(s)}}if(this.#J&&this.#H?.length){let e,t=this.#H;for(;e=t?.shift();)this.#P?.(...e)}return i}clear(){return this.#Me("delete")}#Me(e){for(let t of this.#ne({allowStale:!0})){let i=this.#V[t];if(this.#ee(i))i.__abortController.abort(new Error("deleted"));else{let s=this.#L[t];this.#Q&&this.#R?.(i,s,e),this.#J&&this.#H?.push([i,s,e])}}if(this.#F.clear(),this.#V.fill(void 0),this.#L.fill(void 0),this.#Y&&this.#K){this.#Y.fill(0),this.#K.fill(0);for(let e of this.#q??[])void 0!==e&&clearTimeout(e);this.#q?.fill(void 0)}if(this.#G&&this.#G.fill(0),this.#W=0,this.#j=0,this.#U.length=0,this.#N=0,this.#D=0,this.#J&&this.#H){let e,t=this.#H;for(;e=t?.shift();)this.#P?.(...e)}}};const dt=require("node:path"),pt=require("node:fs");var ft=n.t(pt,2);const gt=require("node:fs/promises"),mt=require("node:events"),yt=require("node:stream"),wt=require("node:string_decoder"),vt="object"==typeof process&&process?process:{stdout:null,stderr:null},bt=e=>!!e&&"object"==typeof e&&(e instanceof ni||e instanceof yt||St(e)||Ct(e)),St=e=>!!e&&"object"==typeof e&&e instanceof mt.EventEmitter&&"function"==typeof e.pipe&&e.pipe!==yt.Writable.prototype.pipe,Ct=e=>!!e&&"object"==typeof e&&e instanceof mt.EventEmitter&&"function"==typeof e.write&&"function"==typeof e.end,Et=Symbol("EOF"),xt=Symbol("maybeEmitEnd"),Mt=Symbol("emittedEnd"),Tt=Symbol("emittingEnd"),Ot=Symbol("emittedError"),kt=Symbol("closed"),Rt=Symbol("read"),It=Symbol("flush"),Pt=Symbol("flushChunk"),_t=Symbol("encoding"),At=Symbol("decoder"),$t=Symbol("flowing"),Dt=Symbol("paused"),Nt=Symbol("resume"),Ft=Symbol("buffer"),Lt=Symbol("pipes"),Vt=Symbol("bufferLength"),Bt=Symbol("bufferPush"),zt=Symbol("bufferShift"),Wt=Symbol("objectMode"),jt=Symbol("destroyed"),Ut=Symbol("error"),Ht=Symbol("emitData"),Gt=Symbol("emitEnd"),Kt=Symbol("emitEnd2"),Yt=Symbol("async"),qt=Symbol("abort"),Qt=Symbol("aborted"),Xt=Symbol("signal"),Jt=Symbol("dataListeners"),Zt=Symbol("discarded"),ei=e=>Promise.resolve().then(e),ti=e=>e();class ii{src;dest;opts;ondrain;constructor(e,t,i){this.src=e,this.dest=t,this.opts=i,this.ondrain=()=>e[Nt](),this.dest.on("drain",this.ondrain)}unpipe(){this.dest.removeListener("drain",this.ondrain)}proxyErrors(e){}end(){this.unpipe(),this.opts.end&&this.dest.end()}}class si extends ii{unpipe(){this.src.removeListener("error",this.proxyErrors),super.unpipe()}constructor(e,t,i){super(e,t,i),this.proxyErrors=e=>this.dest.emit("error",e),e.on("error",this.proxyErrors)}}class ni extends mt.EventEmitter{[$t]=!1;[Dt]=!1;[Lt]=[];[Ft]=[];[Wt];[_t];[Yt];[At];[Et]=!1;[Mt]=!1;[Tt]=!1;[kt]=!1;[Ot]=null;[Vt]=0;[jt]=!1;[Xt];[Qt]=!1;[Jt]=0;[Zt]=!1;writable=!0;readable=!0;constructor(...e){const t=e[0]||{};if(super(),t.objectMode&&"string"==typeof t.encoding)throw new TypeError("Encoding and objectMode may not be used together");var i;t.objectMode?(this[Wt]=!0,this[_t]=null):!(i=t).objectMode&&i.encoding&&"buffer"!==i.encoding?(this[_t]=t.encoding,this[Wt]=!1):(this[Wt]=!1,this[_t]=null),this[Yt]=!!t.async,this[At]=this[_t]?new wt.StringDecoder(this[_t]):null,t&&!0===t.debugExposeBuffer&&Object.defineProperty(this,"buffer",{get:()=>this[Ft]}),t&&!0===t.debugExposePipes&&Object.defineProperty(this,"pipes",{get:()=>this[Lt]});const{signal:s}=t;s&&(this[Xt]=s,s.aborted?this[qt]():s.addEventListener("abort",()=>this[qt]()))}get bufferLength(){return this[Vt]}get encoding(){return this[_t]}set encoding(e){throw new Error("Encoding must be set at instantiation time")}setEncoding(e){throw new Error("Encoding must be set at instantiation time")}get objectMode(){return this[Wt]}set objectMode(e){throw new Error("objectMode must be set at instantiation time")}get async(){return this[Yt]}set async(e){this[Yt]=this[Yt]||!!e}[qt](){this[Qt]=!0,this.emit("abort",this[Xt]?.reason),this.destroy(this[Xt]?.reason)}get aborted(){return this[Qt]}set aborted(e){}write(e,t,i){if(this[Qt])return!1;if(this[Et])throw new Error("write after end");if(this[jt])return this.emit("error",Object.assign(new Error("Cannot call write after a stream was destroyed"),{code:"ERR_STREAM_DESTROYED"})),!0;"function"==typeof t&&(i=t,t="utf8"),t||(t="utf8");const s=this[Yt]?ei:ti;if(!this[Wt]&&!Buffer.isBuffer(e))if(n=e,!Buffer.isBuffer(n)&&ArrayBuffer.isView(n))e=Buffer.from(e.buffer,e.byteOffset,e.byteLength);else if((e=>e instanceof ArrayBuffer||!!e&&"object"==typeof e&&e.constructor&&"ArrayBuffer"===e.constructor.name&&e.byteLength>=0)(e))e=Buffer.from(e);else if("string"!=typeof e)throw new Error("Non-contiguous data written to non-objectMode stream");var n;return this[Wt]?(this[$t]&&0!==this[Vt]&&this[It](!0),this[$t]?this.emit("data",e):this[Bt](e),0!==this[Vt]&&this.emit("readable"),i&&s(i),this[$t]):e.length?("string"!=typeof e||t===this[_t]&&!this[At]?.lastNeed||(e=Buffer.from(e,t)),Buffer.isBuffer(e)&&this[_t]&&(e=this[At].write(e)),this[$t]&&0!==this[Vt]&&this[It](!0),this[$t]?this.emit("data",e):this[Bt](e),0!==this[Vt]&&this.emit("readable"),i&&s(i),this[$t]):(0!==this[Vt]&&this.emit("readable"),i&&s(i),this[$t])}read(e){if(this[jt])return null;if(this[Zt]=!1,0===this[Vt]||0===e||e&&e>this[Vt])return this[xt](),null;this[Wt]&&(e=null),this[Ft].length>1&&!this[Wt]&&(this[Ft]=[this[_t]?this[Ft].join(""):Buffer.concat(this[Ft],this[Vt])]);const t=this[Rt](e||null,this[Ft][0]);return this[xt](),t}[Rt](e,t){if(this[Wt])this[zt]();else{const i=t;e===i.length||null===e?this[zt]():"string"==typeof i?(this[Ft][0]=i.slice(e),t=i.slice(0,e),this[Vt]-=e):(this[Ft][0]=i.subarray(e),t=i.subarray(0,e),this[Vt]-=e)}return this.emit("data",t),this[Ft].length||this[Et]||this.emit("drain"),t}end(e,t,i){return"function"==typeof e&&(i=e,e=void 0),"function"==typeof t&&(i=t,t="utf8"),void 0!==e&&this.write(e,t),i&&this.once("end",i),this[Et]=!0,this.writable=!1,!this[$t]&&this[Dt]||this[xt](),this}[Nt](){this[jt]||(this[Jt]||this[Lt].length||(this[Zt]=!0),this[Dt]=!1,this[$t]=!0,this.emit("resume"),this[Ft].length?this[It]():this[Et]?this[xt]():this.emit("drain"))}resume(){return this[Nt]()}pause(){this[$t]=!1,this[Dt]=!0,this[Zt]=!1}get destroyed(){return this[jt]}get flowing(){return this[$t]}get paused(){return this[Dt]}[Bt](e){this[Wt]?this[Vt]+=1:this[Vt]+=e.length,this[Ft].push(e)}[zt](){return this[Wt]?this[Vt]-=1:this[Vt]-=this[Ft][0].length,this[Ft].shift()}[It](e=!1){do{}while(this[Pt](this[zt]())&&this[Ft].length);e||this[Ft].length||this[Et]||this.emit("drain")}[Pt](e){return this.emit("data",e),this[$t]}pipe(e,t){if(this[jt])return e;this[Zt]=!1;const i=this[Mt];return t=t||{},e===vt.stdout||e===vt.stderr?t.end=!1:t.end=!1!==t.end,t.proxyErrors=!!t.proxyErrors,i?t.end&&e.end():(this[Lt].push(t.proxyErrors?new si(this,e,t):new ii(this,e,t)),this[Yt]?ei(()=>this[Nt]()):this[Nt]()),e}unpipe(e){const t=this[Lt].find(t=>t.dest===e);t&&(1===this[Lt].length?(this[$t]&&0===this[Jt]&&(this[$t]=!1),this[Lt]=[]):this[Lt].splice(this[Lt].indexOf(t),1),t.unpipe())}addListener(e,t){return this.on(e,t)}on(e,t){const i=super.on(e,t);if("data"===e)this[Zt]=!1,this[Jt]++,this[Lt].length||this[$t]||this[Nt]();else if("readable"===e&&0!==this[Vt])super.emit("readable");else if((e=>"end"===e||"finish"===e||"prefinish"===e)(e)&&this[Mt])super.emit(e),this.removeAllListeners(e);else if("error"===e&&this[Ot]){const e=t;this[Yt]?ei(()=>e.call(this,this[Ot])):e.call(this,this[Ot])}return i}removeListener(e,t){return this.off(e,t)}off(e,t){const i=super.off(e,t);return"data"===e&&(this[Jt]=this.listeners("data").length,0!==this[Jt]||this[Zt]||this[Lt].length||(this[$t]=!1)),i}removeAllListeners(e){const t=super.removeAllListeners(e);return"data"!==e&&void 0!==e||(this[Jt]=0,this[Zt]||this[Lt].length||(this[$t]=!1)),t}get emittedEnd(){return this[Mt]}[xt](){this[Tt]||this[Mt]||this[jt]||0!==this[Ft].length||!this[Et]||(this[Tt]=!0,this.emit("end"),this.emit("prefinish"),this.emit("finish"),this[kt]&&this.emit("close"),this[Tt]=!1)}emit(e,...t){const i=t[0];if("error"!==e&&"close"!==e&&e!==jt&&this[jt])return!1;if("data"===e)return!(!this[Wt]&&!i)&&(this[Yt]?(ei(()=>this[Ht](i)),!0):this[Ht](i));if("end"===e)return this[Gt]();if("close"===e){if(this[kt]=!0,!this[Mt]&&!this[jt])return!1;const e=super.emit("close");return this.removeAllListeners("close"),e}if("error"===e){this[Ot]=i,super.emit(Ut,i);const e=!(this[Xt]&&!this.listeners("error").length)&&super.emit("error",i);return this[xt](),e}if("resume"===e){const e=super.emit("resume");return this[xt](),e}if("finish"===e||"prefinish"===e){const t=super.emit(e);return this.removeAllListeners(e),t}const s=super.emit(e,...t);return this[xt](),s}[Ht](e){for(const t of this[Lt])!1===t.dest.write(e)&&this.pause();const t=!this[Zt]&&super.emit("data",e);return this[xt](),t}[Gt](){return!this[Mt]&&(this[Mt]=!0,this.readable=!1,this[Yt]?(ei(()=>this[Kt]()),!0):this[Kt]())}[Kt](){if(this[At]){const e=this[At].end();if(e){for(const t of this[Lt])t.dest.write(e);this[Zt]||super.emit("data",e)}}for(const e of this[Lt])e.end();const e=super.emit("end");return this.removeAllListeners("end"),e}async collect(){const e=Object.assign([],{dataLength:0});this[Wt]||(e.dataLength=0);const t=this.promise();return this.on("data",t=>{e.push(t),this[Wt]||(e.dataLength+=t.length)}),await t,e}async concat(){if(this[Wt])throw new Error("cannot concat in objectMode");const e=await this.collect();return this[_t]?e.join(""):Buffer.concat(e,e.dataLength)}async promise(){return new Promise((e,t)=>{this.on(jt,()=>t(new Error("stream destroyed"))),this.on("error",e=>t(e)),this.on("end",()=>e())})}[Symbol.asyncIterator](){this[Zt]=!1;let e=!1;const t=async()=>(this.pause(),e=!0,{value:void 0,done:!0});return{next:()=>{if(e)return t();const i=this.read();if(null!==i)return Promise.resolve({done:!1,value:i});if(this[Et])return t();let s,n;const r=e=>{this.off("data",o),this.off("end",a),this.off(jt,l),t(),n(e)},o=e=>{this.off("error",r),this.off("end",a),this.off(jt,l),this.pause(),s({value:e,done:!!this[Et]})},a=()=>{this.off("error",r),this.off("data",o),this.off(jt,l),t(),s({done:!0,value:void 0})},l=()=>r(new Error("stream destroyed"));return new Promise((e,t)=>{n=t,s=e,this.once(jt,l),this.once("error",r),this.once("end",a),this.once("data",o)})},throw:t,return:t,[Symbol.asyncIterator](){return this},[Symbol.asyncDispose]:async()=>{}}}[Symbol.iterator](){this[Zt]=!1;let e=!1;const t=()=>(this.pause(),this.off(Ut,t),this.off(jt,t),this.off("end",t),e=!0,{done:!0,value:void 0});return this.once("end",t),this.once(Ut,t),this.once(jt,t),{next:()=>{if(e)return t();const i=this.read();return null===i?t():{done:!1,value:i}},throw:t,return:t,[Symbol.iterator](){return this},[Symbol.dispose]:()=>{}}}destroy(e){return this[jt]?(e?this.emit("error",e):this.emit(jt),this):(this[jt]=!0,this[Zt]=!0,this[Ft].length=0,this[Vt]=0,"function"!=typeof this.close||this[kt]||this.close(),e?this.emit("error",e):this.emit(jt),this)}static get isStream(){return bt}}const ri=c.realpathSync.native,oi={lstatSync:c.lstatSync,readdir:c.readdir,readdirSync:c.readdirSync,readlinkSync:c.readlinkSync,realpathSync:ri,promises:{lstat:gt.lstat,readdir:gt.readdir,readlink:gt.readlink,realpath:gt.realpath}},ai=e=>e&&e!==oi&&e!==ft?{...oi,...e,promises:{...oi.promises,...e.promises||{}}}:oi,li=/^\\\\\?\\([a-z]:)\\?$/i,hi=/[\\\/]/,ci=10,ui=15,di=-16,pi=128,fi=e=>e.isFile()?8:e.isDirectory()?4:e.isSymbolicLink()?ci:e.isCharacterDevice()?2:e.isBlockDevice()?6:e.isSocket()?12:e.isFIFO()?1:0,gi=new ut({max:4096}),mi=e=>{const t=gi.get(e);if(t)return t;const i=e.normalize("NFKD");return gi.set(e,i),i},yi=new ut({max:4096}),wi=e=>{const t=yi.get(e);if(t)return t;const i=mi(e.toLowerCase());return yi.set(e,i),i};class vi extends ut{constructor(){super({max:256})}}class bi extends ut{constructor(e=16384){super({maxSize:e,sizeCalculation:e=>e.length+1})}}const Si=Symbol("PathScurry setAsCwd");class Ci{name;root;roots;parent;nocase;isCWD=!1;#Te;#Oe;get dev(){return this.#Oe}#ke;get mode(){return this.#ke}#Re;get nlink(){return this.#Re}#Ie;get uid(){return this.#Ie}#Pe;get gid(){return this.#Pe}#_e;get rdev(){return this.#_e}#Ae;get blksize(){return this.#Ae}#$e;get ino(){return this.#$e}#De;get size(){return this.#De}#Ne;get blocks(){return this.#Ne}#Fe;get atimeMs(){return this.#Fe}#Le;get mtimeMs(){return this.#Le}#Ve;get ctimeMs(){return this.#Ve}#Be;get birthtimeMs(){return this.#Be}#ze;get atime(){return this.#ze}#We;get mtime(){return this.#We}#je;get ctime(){return this.#je}#Ue;get birthtime(){return this.#Ue}#He;#Ge;#Ke;#Ye;#qe;#Qe;#Xe;#Je;#Ze;#et;get parentPath(){return(this.parent||this).fullpath()}get path(){return this.parentPath}constructor(e,t=0,i,s,n,r,o){this.name=e,this.#He=n?wi(e):mi(e),this.#Xe=1023&t,this.nocase=n,this.roots=s,this.root=i||this,this.#Je=r,this.#Ke=o.fullpath,this.#qe=o.relative,this.#Qe=o.relativePosix,this.parent=o.parent,this.parent?this.#Te=this.parent.#Te:this.#Te=ai(o.fs)}depth(){return void 0!==this.#Ge?this.#Ge:this.parent?this.#Ge=this.parent.depth()+1:this.#Ge=0}childrenCache(){return this.#Je}resolve(e){if(!e)return this;const t=this.getRootString(e),i=e.substring(t.length).split(this.splitSep);return t?this.getRoot(t).#tt(i):this.#tt(i)}#tt(e){let t=this;for(const i of e)t=t.child(i);return t}children(){const e=this.#Je.get(this);if(e)return e;const t=Object.assign([],{provisional:0});return this.#Je.set(this,t),this.#Xe&=-17,t}child(e,t){if(""===e||"."===e)return this;if(".."===e)return this.parent||this;const i=this.children(),s=this.nocase?wi(e):mi(e);for(const e of i)if(e.#He===s)return e;const n=this.parent?this.sep:"",r=this.#Ke?this.#Ke+n+e:void 0,o=this.newChild(e,0,{...t,parent:this,fullpath:r});return this.canReaddir()||(o.#Xe|=pi),i.push(o),o}relative(){if(this.isCWD)return"";if(void 0!==this.#qe)return this.#qe;const e=this.name,t=this.parent;if(!t)return this.#qe=this.name;const i=t.relative();return i+(i&&t.parent?this.sep:"")+e}relativePosix(){if("/"===this.sep)return this.relative();if(this.isCWD)return"";if(void 0!==this.#Qe)return this.#Qe;const e=this.name,t=this.parent;if(!t)return this.#Qe=this.fullpathPosix();const i=t.relativePosix();return i+(i&&t.parent?"/":"")+e}fullpath(){if(void 0!==this.#Ke)return this.#Ke;const e=this.name,t=this.parent;if(!t)return this.#Ke=this.name;const i=t.fullpath()+(t.parent?this.sep:"")+e;return this.#Ke=i}fullpathPosix(){if(void 0!==this.#Ye)return this.#Ye;if("/"===this.sep)return this.#Ye=this.fullpath();if(!this.parent){const e=this.fullpath().replace(/\\/g,"/");return/^[a-z]:\//i.test(e)?this.#Ye=`//?/${e}`:this.#Ye=e}const e=this.parent,t=e.fullpathPosix(),i=t+(t&&e.parent?"/":"")+this.name;return this.#Ye=i}isUnknown(){return 0===(this.#Xe&ui)}isType(e){return this[`is${e}`]()}getType(){return this.isUnknown()?"Unknown":this.isDirectory()?"Directory":this.isFile()?"File":this.isSymbolicLink()?"SymbolicLink":this.isFIFO()?"FIFO":this.isCharacterDevice()?"CharacterDevice":this.isBlockDevice()?"BlockDevice":this.isSocket()?"Socket":"Unknown"}isFile(){return 8===(this.#Xe&ui)}isDirectory(){return 4===(this.#Xe&ui)}isCharacterDevice(){return 2===(this.#Xe&ui)}isBlockDevice(){return 6===(this.#Xe&ui)}isFIFO(){return 1===(this.#Xe&ui)}isSocket(){return 12===(this.#Xe&ui)}isSymbolicLink(){return(this.#Xe&ci)===ci}lstatCached(){return 32&this.#Xe?this:void 0}readlinkCached(){return this.#Ze}realpathCached(){return this.#et}readdirCached(){const e=this.children();return e.slice(0,e.provisional)}canReadlink(){if(this.#Ze)return!0;if(!this.parent)return!1;const e=this.#Xe&ui;return!(0!==e&&e!==ci||256&this.#Xe||this.#Xe&pi)}calledReaddir(){return!!(16&this.#Xe)}isENOENT(){return!!(this.#Xe&pi)}isNamed(e){return this.nocase?this.#He===wi(e):this.#He===mi(e)}async readlink(){const e=this.#Ze;if(e)return e;if(this.canReadlink()&&this.parent)try{const e=await this.#Te.promises.readlink(this.fullpath()),t=(await this.parent.realpath())?.resolve(e);if(t)return this.#Ze=t}catch(e){return void this.#it(e.code)}}readlinkSync(){const e=this.#Ze;if(e)return e;if(this.canReadlink()&&this.parent)try{const e=this.#Te.readlinkSync(this.fullpath()),t=this.parent.realpathSync()?.resolve(e);if(t)return this.#Ze=t}catch(e){return void this.#it(e.code)}}#st(e){this.#Xe|=16;for(let t=e.provisional;t<e.length;t++){const i=e[t];i&&i.#nt()}}#nt(){this.#Xe&pi||(this.#Xe=(this.#Xe|pi)&di,this.#rt())}#rt(){const e=this.children();e.provisional=0;for(const t of e)t.#nt()}#ot(){this.#Xe|=512,this.#at()}#at(){if(64&this.#Xe)return;let e=this.#Xe;4===(e&ui)&&(e&=di),this.#Xe=64|e,this.#rt()}#lt(e=""){"ENOTDIR"===e||"EPERM"===e?this.#at():"ENOENT"===e?this.#nt():this.children().provisional=0}#ht(e=""){"ENOTDIR"===e?this.parent.#at():"ENOENT"===e&&this.#nt()}#it(e=""){let t=this.#Xe;t|=256,"ENOENT"===e&&(t|=pi),"EINVAL"!==e&&"UNKNOWN"!==e||(t&=di),this.#Xe=t,"ENOTDIR"===e&&this.parent&&this.parent.#at()}#ct(e,t){return this.#ut(e,t)||this.#dt(e,t)}#dt(e,t){const i=fi(e),s=this.newChild(e.name,i,{parent:this}),n=s.#Xe&ui;return 4!==n&&n!==ci&&0!==n&&(s.#Xe|=64),t.unshift(s),t.provisional++,s}#ut(e,t){for(let i=t.provisional;i<t.length;i++){const s=t[i];if((this.nocase?wi(e.name):mi(e.name))===s.#He)return this.#pt(e,s,i,t)}}#pt(e,t,i,s){const n=t.name;return t.#Xe=t.#Xe&di|fi(e),n!==e.name&&(t.name=e.name),i!==s.provisional&&(i===s.length-1?s.pop():s.splice(i,1),s.unshift(t)),s.provisional++,t}async lstat(){if(0===(this.#Xe&pi))try{return this.#ft(await this.#Te.promises.lstat(this.fullpath())),this}catch(e){this.#ht(e.code)}}lstatSync(){if(0===(this.#Xe&pi))try{return this.#ft(this.#Te.lstatSync(this.fullpath())),this}catch(e){this.#ht(e.code)}}#ft(e){const{atime:t,atimeMs:i,birthtime:s,birthtimeMs:n,blksize:r,blocks:o,ctime:a,ctimeMs:l,dev:h,gid:c,ino:u,mode:d,mtime:p,mtimeMs:f,nlink:g,rdev:m,size:y,uid:w}=e;this.#ze=t,this.#Fe=i,this.#Ue=s,this.#Be=n,this.#Ae=r,this.#Ne=o,this.#je=a,this.#Ve=l,this.#Oe=h,this.#Pe=c,this.#$e=u,this.#ke=d,this.#We=p,this.#Le=f,this.#Re=g,this.#_e=m,this.#De=y,this.#Ie=w;const v=fi(e);this.#Xe=this.#Xe&di|v|32,0!==v&&4!==v&&v!==ci&&(this.#Xe|=64)}#gt=[];#mt=!1;#yt(e){this.#mt=!1;const t=this.#gt.slice();this.#gt.length=0,t.forEach(t=>t(null,e))}readdirCB(e,t=!1){if(!this.canReaddir())return void(t?e(null,[]):queueMicrotask(()=>e(null,[])));const i=this.children();if(this.calledReaddir()){const s=i.slice(0,i.provisional);return void(t?e(null,s):queueMicrotask(()=>e(null,s)))}if(this.#gt.push(e),this.#mt)return;this.#mt=!0;const s=this.fullpath();this.#Te.readdir(s,{withFileTypes:!0},(e,t)=>{if(e)this.#lt(e.code),i.provisional=0;else{for(const e of t)this.#ct(e,i);this.#st(i)}this.#yt(i.slice(0,i.provisional))})}#wt;async readdir(){if(!this.canReaddir())return[];const e=this.children();if(this.calledReaddir())return e.slice(0,e.provisional);const t=this.fullpath();if(this.#wt)await this.#wt;else{let i=()=>{};this.#wt=new Promise(e=>i=e);try{for(const i of await this.#Te.promises.readdir(t,{withFileTypes:!0}))this.#ct(i,e);this.#st(e)}catch(t){this.#lt(t.code),e.provisional=0}this.#wt=void 0,i()}return e.slice(0,e.provisional)}readdirSync(){if(!this.canReaddir())return[];const e=this.children();if(this.calledReaddir())return e.slice(0,e.provisional);const t=this.fullpath();try{for(const i of this.#Te.readdirSync(t,{withFileTypes:!0}))this.#ct(i,e);this.#st(e)}catch(t){this.#lt(t.code),e.provisional=0}return e.slice(0,e.provisional)}canReaddir(){if(704&this.#Xe)return!1;const e=ui&this.#Xe;return 0===e||4===e||e===ci}shouldWalk(e,t){return!(4&~this.#Xe)&&!(704&this.#Xe)&&!e.has(this)&&(!t||t(this))}async realpath(){if(this.#et)return this.#et;if(!(896&this.#Xe))try{const e=await this.#Te.promises.realpath(this.fullpath());return this.#et=this.resolve(e)}catch(e){this.#ot()}}realpathSync(){if(this.#et)return this.#et;if(!(896&this.#Xe))try{const e=this.#Te.realpathSync(this.fullpath());return this.#et=this.resolve(e)}catch(e){this.#ot()}}[Si](e){if(e===this)return;e.isCWD=!1,this.isCWD=!0;const t=new Set([]);let i=[],s=this;for(;s&&s.parent;)t.add(s),s.#qe=i.join(this.sep),s.#Qe=i.join("/"),s=s.parent,i.push("..");for(s=e;s&&s.parent&&!t.has(s);)s.#qe=void 0,s.#Qe=void 0,s=s.parent}}class Ei extends Ci{sep="\\";splitSep=hi;constructor(e,t=0,i,s,n,r,o){super(e,t,i,s,n,r,o)}newChild(e,t=0,i={}){return new Ei(e,t,this.root,this.roots,this.nocase,this.childrenCache(),i)}getRootString(e){return dt.win32.parse(e).root}getRoot(e){if((e=(e=>e.replace(/\//g,"\\").replace(li,"$1\\"))(e.toUpperCase()))===this.root.name)return this.root;for(const[t,i]of Object.entries(this.roots))if(this.sameRoot(e,t))return this.roots[e]=i;return this.roots[e]=new Ti(e,this).root}sameRoot(e,t=this.root.name){return(e=e.toUpperCase().replace(/\//g,"\\").replace(li,"$1\\"))===t}}class xi extends Ci{splitSep="/";sep="/";constructor(e,t=0,i,s,n,r,o){super(e,t,i,s,n,r,o)}getRootString(e){return e.startsWith("/")?"/":""}getRoot(e){return this.root}newChild(e,t=0,i={}){return new xi(e,t,this.root,this.roots,this.nocase,this.childrenCache(),i)}}class Mi{root;rootPath;roots;cwd;#vt;#bt;#Je;nocase;#Te;constructor(e=process.cwd(),t,i,{nocase:s,childrenCacheSize:n=16384,fs:r=oi}={}){this.#Te=ai(r),(e instanceof URL||e.startsWith("file://"))&&(e=(0,Ze.fileURLToPath)(e));const o=t.resolve(e);this.roots=Object.create(null),this.rootPath=this.parseRootPath(o),this.#vt=new vi,this.#bt=new vi,this.#Je=new bi(n);const a=o.substring(this.rootPath.length).split(i);if(1!==a.length||a[0]||a.pop(),void 0===s)throw new TypeError("must provide nocase setting to PathScurryBase ctor");this.nocase=s,this.root=this.newRoot(this.#Te),this.roots[this.rootPath]=this.root;let l=this.root,h=a.length-1;const c=t.sep;let u=this.rootPath,d=!1;for(const e of a){const t=h--;l=l.child(e,{relative:new Array(t).fill("..").join(c),relativePosix:new Array(t).fill("..").join("/"),fullpath:u+=(d?"":c)+e}),d=!0}this.cwd=l}depth(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.depth()}childrenCache(){return this.#Je}resolve(...e){let t="";for(let i=e.length-1;i>=0;i--){const s=e[i];if(s&&"."!==s&&(t=t?`${s}/${t}`:s,this.isAbsolute(s)))break}const i=this.#vt.get(t);if(void 0!==i)return i;const s=this.cwd.resolve(t).fullpath();return this.#vt.set(t,s),s}resolvePosix(...e){let t="";for(let i=e.length-1;i>=0;i--){const s=e[i];if(s&&"."!==s&&(t=t?`${s}/${t}`:s,this.isAbsolute(s)))break}const i=this.#bt.get(t);if(void 0!==i)return i;const s=this.cwd.resolve(t).fullpathPosix();return this.#bt.set(t,s),s}relative(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.relative()}relativePosix(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.relativePosix()}basename(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.name}dirname(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),(e.parent||e).fullpath()}async readdir(e=this.cwd,t={withFileTypes:!0}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i}=t;if(e.canReaddir()){const t=await e.readdir();return i?t:t.map(e=>e.name)}return[]}readdirSync(e=this.cwd,t={withFileTypes:!0}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0}=t;return e.canReaddir()?i?e.readdirSync():e.readdirSync().map(e=>e.name):[]}async lstat(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.lstat()}lstatSync(e=this.cwd){return"string"==typeof e&&(e=this.cwd.resolve(e)),e.lstatSync()}async readlink(e=this.cwd,{withFileTypes:t}={withFileTypes:!1}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e.withFileTypes,e=this.cwd);const i=await e.readlink();return t?i:i?.fullpath()}readlinkSync(e=this.cwd,{withFileTypes:t}={withFileTypes:!1}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e.withFileTypes,e=this.cwd);const i=e.readlinkSync();return t?i:i?.fullpath()}async realpath(e=this.cwd,{withFileTypes:t}={withFileTypes:!1}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e.withFileTypes,e=this.cwd);const i=await e.realpath();return t?i:i?.fullpath()}realpathSync(e=this.cwd,{withFileTypes:t}={withFileTypes:!1}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e.withFileTypes,e=this.cwd);const i=e.realpathSync();return t?i:i?.fullpath()}async walk(e=this.cwd,t={}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0,follow:s=!1,filter:n,walkFilter:r}=t,o=[];n&&!n(e)||o.push(i?e:e.fullpath());const a=new Set,l=(e,t)=>{a.add(e),e.readdirCB((e,h)=>{if(e)return t(e);let c=h.length;if(!c)return t();const u=()=>{0===--c&&t()};for(const e of h)n&&!n(e)||o.push(i?e:e.fullpath()),s&&e.isSymbolicLink()?e.realpath().then(e=>e?.isUnknown()?e.lstat():e).then(e=>e?.shouldWalk(a,r)?l(e,u):u()):e.shouldWalk(a,r)?l(e,u):u()},!0)},h=e;return new Promise((e,t)=>{l(h,i=>{if(i)return t(i);e(o)})})}walkSync(e=this.cwd,t={}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0,follow:s=!1,filter:n,walkFilter:r}=t,o=[];n&&!n(e)||o.push(i?e:e.fullpath());const a=new Set([e]);for(const e of a){const t=e.readdirSync();for(const e of t){n&&!n(e)||o.push(i?e:e.fullpath());let t=e;if(e.isSymbolicLink()){if(!s||!(t=e.realpathSync()))continue;t.isUnknown()&&t.lstatSync()}t.shouldWalk(a,r)&&a.add(t)}}return o}[Symbol.asyncIterator](){return this.iterate()}iterate(e=this.cwd,t={}){return"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd),this.stream(e,t)[Symbol.asyncIterator]()}[Symbol.iterator](){return this.iterateSync()}*iterateSync(e=this.cwd,t={}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0,follow:s=!1,filter:n,walkFilter:r}=t;n&&!n(e)||(yield i?e:e.fullpath());const o=new Set([e]);for(const e of o){const t=e.readdirSync();for(const e of t){n&&!n(e)||(yield i?e:e.fullpath());let t=e;if(e.isSymbolicLink()){if(!s||!(t=e.realpathSync()))continue;t.isUnknown()&&t.lstatSync()}t.shouldWalk(o,r)&&o.add(t)}}}stream(e=this.cwd,t={}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0,follow:s=!1,filter:n,walkFilter:r}=t,o=new ni({objectMode:!0});n&&!n(e)||o.write(i?e:e.fullpath());const a=new Set,l=[e];let h=0;const c=()=>{let e=!1;for(;!e;){const t=l.shift();if(!t)return void(0===h&&o.end());h++,a.add(t);const u=(t,p,f=!1)=>{if(t)return o.emit("error",t);if(s&&!f){const e=[];for(const t of p)t.isSymbolicLink()&&e.push(t.realpath().then(e=>e?.isUnknown()?e.lstat():e));if(e.length)return void Promise.all(e).then(()=>u(null,p,!0))}for(const t of p)!t||n&&!n(t)||o.write(i?t:t.fullpath())||(e=!0);h--;for(const e of p){const t=e.realpathCached()||e;t.shouldWalk(a,r)&&l.push(t)}e&&!o.flowing?o.once("drain",c):d||c()};let d=!0;t.readdirCB(u,!0),d=!1}};return c(),o}streamSync(e=this.cwd,t={}){"string"==typeof e?e=this.cwd.resolve(e):e instanceof Ci||(t=e,e=this.cwd);const{withFileTypes:i=!0,follow:s=!1,filter:n,walkFilter:r}=t,o=new ni({objectMode:!0}),a=new Set;n&&!n(e)||o.write(i?e:e.fullpath());const l=[e];let h=0;const c=()=>{let e=!1;for(;!e;){const t=l.shift();if(!t)return void(0===h&&o.end());h++,a.add(t);const c=t.readdirSync();for(const t of c)n&&!n(t)||o.write(i?t:t.fullpath())||(e=!0);h--;for(const e of c){let t=e;if(e.isSymbolicLink()){if(!s||!(t=e.realpathSync()))continue;t.isUnknown()&&t.lstatSync()}t.shouldWalk(a,r)&&l.push(t)}}e&&!o.flowing&&o.once("drain",c)};return c(),o}chdir(e=this.cwd){const t=this.cwd;this.cwd="string"==typeof e?this.cwd.resolve(e):e,this.cwd[Si](t)}}class Ti extends Mi{sep="\\";constructor(e=process.cwd(),t={}){const{nocase:i=!0}=t;super(e,dt.win32,"\\",{...t,nocase:i}),this.nocase=i;for(let e=this.cwd;e;e=e.parent)e.nocase=this.nocase}parseRootPath(e){return dt.win32.parse(e).root.toUpperCase()}newRoot(e){return new Ei(this.rootPath,4,void 0,this.roots,this.nocase,this.childrenCache(),{fs:e})}isAbsolute(e){return e.startsWith("/")||e.startsWith("\\")||/^[a-z]:(\/|\\)/i.test(e)}}class Oi extends Mi{sep="/";constructor(e=process.cwd(),t={}){const{nocase:i=!1}=t;super(e,dt.posix,"/",{...t,nocase:i}),this.nocase=i}parseRootPath(e){return"/"}newRoot(e){return new xi(this.rootPath,4,void 0,this.roots,this.nocase,this.childrenCache(),{fs:e})}isAbsolute(e){return e.startsWith("/")}}class ki extends Oi{constructor(e=process.cwd(),t={}){const{nocase:i=!0}=t;super(e,{...t,nocase:i})}}process.platform;const Ri="win32"===process.platform?Ti:"darwin"===process.platform?ki:Oi;class Ii{#St;#Ct;#Et;length;#xt;#Mt;#Tt;#Ot;#kt;#Rt;#It=!0;constructor(e,t,i,s){if(!(e.length>=1))throw new TypeError("empty pattern list");if(!(t.length>=1))throw new TypeError("empty glob list");if(t.length!==e.length)throw new TypeError("mismatched pattern list and glob list lengths");if(this.length=e.length,i<0||i>=this.length)throw new TypeError("index out of range");if(this.#St=e,this.#Ct=t,this.#Et=i,this.#xt=s,0===this.#Et)if(this.isUNC()){const[e,t,i,s,...n]=this.#St,[r,o,a,l,...h]=this.#Ct;""===n[0]&&(n.shift(),h.shift());const c=[e,t,i,s,""].join("/"),u=[r,o,a,l,""].join("/");this.#St=[c,...n],this.#Ct=[u,...h],this.length=this.#St.length}else if(this.isDrive()||this.isAbsolute()){const[e,...t]=this.#St,[i,...s]=this.#Ct;""===t[0]&&(t.shift(),s.shift());const n=e+"/",r=i+"/";this.#St=[n,...t],this.#Ct=[r,...s],this.length=this.#St.length}}pattern(){return this.#St[this.#Et]}isString(){return"string"==typeof this.#St[this.#Et]}isGlobstar(){return this.#St[this.#Et]===Ye}isRegExp(){return this.#St[this.#Et]instanceof RegExp}globString(){return this.#Tt=this.#Tt||(0===this.#Et?this.isAbsolute()?this.#Ct[0]+this.#Ct.slice(1).join("/"):this.#Ct.join("/"):this.#Ct.slice(this.#Et).join("/"))}hasMore(){return this.length>this.#Et+1}rest(){return void 0!==this.#Mt?this.#Mt:this.hasMore()?(this.#Mt=new Ii(this.#St,this.#Ct,this.#Et+1,this.#xt),this.#Mt.#Rt=this.#Rt,this.#Mt.#kt=this.#kt,this.#Mt.#Ot=this.#Ot,this.#Mt):this.#Mt=null}isUNC(){const e=this.#St;return void 0!==this.#kt?this.#kt:this.#kt="win32"===this.#xt&&0===this.#Et&&""===e[0]&&""===e[1]&&"string"==typeof e[2]&&!!e[2]&&"string"==typeof e[3]&&!!e[3]}isDrive(){const e=this.#St;return void 0!==this.#Ot?this.#Ot:this.#Ot="win32"===this.#xt&&0===this.#Et&&this.length>1&&"string"==typeof e[0]&&/^[a-z]:$/i.test(e[0])}isAbsolute(){const e=this.#St;return void 0!==this.#Rt?this.#Rt:this.#Rt=""===e[0]&&e.length>1||this.isDrive()||this.isUNC()}root(){const e=this.#St[0];return"string"==typeof e&&this.isAbsolute()&&0===this.#Et?e:""}checkFollowGlobstar(){return!(0===this.#Et||!this.isGlobstar()||!this.#It)}markFollowGlobstar(){return!(0===this.#Et||!this.isGlobstar()||!this.#It||(this.#It=!1,0))}}const Pi="object"==typeof process&&process&&"string"==typeof process.platform?process.platform:"linux";class _i{relative;relativeChildren;absolute;absoluteChildren;platform;mmopts;constructor(e,{nobrace:t,nocase:i,noext:s,noglobstar:n,platform:r=Pi}){this.relative=[],this.absolute=[],this.relativeChildren=[],this.absoluteChildren=[],this.platform=r,this.mmopts={dot:!0,nobrace:t,nocase:i,noext:s,noglobstar:n,optimizationLevel:2,platform:r,nocomment:!0,nonegate:!0};for(const t of e)this.add(t)}add(e){const t=new Je(e,this.mmopts);for(let e=0;e<t.set.length;e++){const i=t.set[e],s=t.globParts[e];if(!i||!s)throw new Error("invalid pattern object");for(;"."===i[0]&&"."===s[0];)i.shift(),s.shift();const n=new Ii(i,s,0,this.platform),r=new Je(n.globString(),this.mmopts),o="**"===s[s.length-1],a=n.isAbsolute();a?this.absolute.push(r):this.relative.push(r),o&&(a?this.absoluteChildren.push(r):this.relativeChildren.push(r))}}ignored(e){const t=e.fullpath(),i=`${t}/`,s=e.relative()||".",n=`${s}/`;for(const e of this.relative)if(e.match(s)||e.match(n))return!0;for(const e of this.absolute)if(e.match(t)||e.match(i))return!0;return!1}childrenIgnored(e){const t=e.fullpath()+"/",i=(e.relative()||".")+"/";for(const e of this.relativeChildren)if(e.match(i))return!0;for(const e of this.absoluteChildren)if(e.match(t))return!0;return!1}}class Ai{store;constructor(e=new Map){this.store=e}copy(){return new Ai(new Map(this.store))}hasWalked(e,t){return this.store.get(e.fullpath())?.has(t.globString())}storeWalked(e,t){const i=e.fullpath(),s=this.store.get(i);s?s.add(t.globString()):this.store.set(i,new Set([t.globString()]))}}class $i{store=new Map;add(e,t,i){const s=(t?2:0)|(i?1:0),n=this.store.get(e);this.store.set(e,void 0===n?s:s&n)}entries(){return[...this.store.entries()].map(([e,t])=>[e,!!(2&t),!!(1&t)])}}class Di{store=new Map;add(e,t){if(!e.canReaddir())return;const i=this.store.get(e);i?i.find(e=>e.globString()===t.globString())||i.push(t):this.store.set(e,[t])}get(e){const t=this.store.get(e);if(!t)throw new Error("attempting to walk unknown path");return t}entries(){return this.keys().map(e=>[e,this.store.get(e)])}keys(){return[...this.store.keys()].filter(e=>e.canReaddir())}}class Ni{hasWalkedCache;matches=new $i;subwalks=new Di;patterns;follow;dot;opts;constructor(e,t){this.opts=e,this.follow=!!e.follow,this.dot=!!e.dot,this.hasWalkedCache=t?t.copy():new Ai}processPatterns(e,t){this.patterns=t;const i=t.map(t=>[e,t]);for(let[e,t]of i){this.hasWalkedCache.storeWalked(e,t);const i=t.root(),s=t.isAbsolute()&&!1!==this.opts.absolute;if(i){e=e.resolve("/"===i&&void 0!==this.opts.root?this.opts.root:i);const s=t.rest();if(!s){this.matches.add(e,!0,!1);continue}t=s}if(e.isENOENT())continue;let n,r,o=!1;for(;"string"==typeof(n=t.pattern())&&(r=t.rest());){const i=e.resolve(n);e=i,t=r,o=!0}if(n=t.pattern(),r=t.rest(),o){if(this.hasWalkedCache.hasWalked(e,t))continue;this.hasWalkedCache.storeWalked(e,t)}if("string"==typeof n){const t=".."===n||""===n||"."===n;this.matches.add(e.resolve(n),s,t);continue}if(n===Ye){(!e.isSymbolicLink()||this.follow||t.checkFollowGlobstar())&&this.subwalks.add(e,t);const i=r?.pattern(),n=r?.rest();if(r&&(""!==i&&"."!==i||n)){if(".."===i){const t=e.parent||e;n?this.hasWalkedCache.hasWalked(t,n)||this.subwalks.add(t,n):this.matches.add(t,s,!0)}}else this.matches.add(e,s,""===i||"."===i)}else n instanceof RegExp&&this.subwalks.add(e,t)}return this}subwalkTargets(){return this.subwalks.keys()}child(){return new Ni(this.opts,this.hasWalkedCache)}filterEntries(e,t){const i=this.subwalks.get(e),s=this.child();for(const e of t)for(const t of i){const i=t.isAbsolute(),n=t.pattern(),r=t.rest();n===Ye?s.testGlobstar(e,t,r,i):n instanceof RegExp?s.testRegExp(e,n,r,i):s.testString(e,n,r,i)}return s}testGlobstar(e,t,i,s){if(!this.dot&&e.name.startsWith(".")||(t.hasMore()||this.matches.add(e,s,!1),e.canReaddir()&&(this.follow||!e.isSymbolicLink()?this.subwalks.add(e,t):e.isSymbolicLink()&&(i&&t.checkFollowGlobstar()?this.subwalks.add(e,i):t.markFollowGlobstar()&&this.subwalks.add(e,t)))),i){const t=i.pattern();if("string"==typeof t&&".."!==t&&""!==t&&"."!==t)this.testString(e,t,i.rest(),s);else if(".."===t){const t=e.parent||e;this.subwalks.add(t,i)}else t instanceof RegExp&&this.testRegExp(e,t,i.rest(),s)}}testRegExp(e,t,i,s){t.test(e.name)&&(i?this.subwalks.add(e,i):this.matches.add(e,s,!1))}testString(e,t,i,s){e.isNamed(t)&&(i?this.subwalks.add(e,i):this.matches.add(e,s,!1))}}class Fi{path;patterns;opts;seen=new Set;paused=!1;aborted=!1;#Pt=[];#_t;#At;signal;maxDepth;includeChildMatches;constructor(e,t,i){if(this.patterns=e,this.path=t,this.opts=i,this.#At=i.posix||"win32"!==i.platform?"/":"\\",this.includeChildMatches=!1!==i.includeChildMatches,(i.ignore||!this.includeChildMatches)&&(this.#_t=((e,t)=>"string"==typeof e?new _i([e],t):Array.isArray(e)?new _i(e,t):e)(i.ignore??[],i),!this.includeChildMatches&&"function"!=typeof this.#_t.add))throw new Error("cannot ignore child matches, ignore lacks add() method.");this.maxDepth=i.maxDepth||1/0,i.signal&&(this.signal=i.signal,this.signal.addEventListener("abort",()=>{this.#Pt.length=0}))}#$t(e){return this.seen.has(e)||!!this.#_t?.ignored?.(e)}#Dt(e){return!!this.#_t?.childrenIgnored?.(e)}pause(){this.paused=!0}resume(){if(this.signal?.aborted)return;let e;for(this.paused=!1;!this.paused&&(e=this.#Pt.shift());)e()}onResume(e){this.signal?.aborted||(this.paused?this.#Pt.push(e):e())}async matchCheck(e,t){if(t&&this.opts.nodir)return;let i;if(this.opts.realpath){if(i=e.realpathCached()||await e.realpath(),!i)return;e=i}const s=e.isUnknown()||this.opts.stat?await e.lstat():e;if(this.opts.follow&&this.opts.nodir&&s?.isSymbolicLink()){const e=await s.realpath();e&&(e.isUnknown()||this.opts.stat)&&await e.lstat()}return this.matchCheckTest(s,t)}matchCheckTest(e,t){return!e||!(this.maxDepth===1/0||e.depth()<=this.maxDepth)||t&&!e.canReaddir()||this.opts.nodir&&e.isDirectory()||this.opts.nodir&&this.opts.follow&&e.isSymbolicLink()&&e.realpathCached()?.isDirectory()||this.#$t(e)?void 0:e}matchCheckSync(e,t){if(t&&this.opts.nodir)return;let i;if(this.opts.realpath){if(i=e.realpathCached()||e.realpathSync(),!i)return;e=i}const s=e.isUnknown()||this.opts.stat?e.lstatSync():e;if(this.opts.follow&&this.opts.nodir&&s?.isSymbolicLink()){const e=s.realpathSync();e&&(e?.isUnknown()||this.opts.stat)&&e.lstatSync()}return this.matchCheckTest(s,t)}matchFinish(e,t){if(this.#$t(e))return;if(!this.includeChildMatches&&this.#_t?.add){const t=`${e.relativePosix()}/**`;this.#_t.add(t)}const i=void 0===this.opts.absolute?t:this.opts.absolute;this.seen.add(e);const s=this.opts.mark&&e.isDirectory()?this.#At:"";if(this.opts.withFileTypes)this.matchEmit(e);else if(i){const t=this.opts.posix?e.fullpathPosix():e.fullpath();this.matchEmit(t+s)}else{const t=this.opts.posix?e.relativePosix():e.relative(),i=this.opts.dotRelative&&!t.startsWith(".."+this.#At)?"."+this.#At:"";this.matchEmit(t?i+t+s:"."+s)}}async match(e,t,i){const s=await this.matchCheck(e,i);s&&this.matchFinish(s,t)}matchSync(e,t,i){const s=this.matchCheckSync(e,i);s&&this.matchFinish(s,t)}walkCB(e,t,i){this.signal?.aborted&&i(),this.walkCB2(e,t,new Ni(this.opts),i)}walkCB2(e,t,i,s){if(this.#Dt(e))return s();if(this.signal?.aborted&&s(),this.paused)return void this.onResume(()=>this.walkCB2(e,t,i,s));i.processPatterns(e,t);let n=1;const r=()=>{0===--n&&s()};for(const[e,t,s]of i.matches.entries())this.#$t(e)||(n++,this.match(e,t,s).then(()=>r()));for(const e of i.subwalkTargets()){if(this.maxDepth!==1/0&&e.depth()>=this.maxDepth)continue;n++;const t=e.readdirCached();e.calledReaddir()?this.walkCB3(e,t,i,r):e.readdirCB((t,s)=>this.walkCB3(e,s,i,r),!0)}r()}walkCB3(e,t,i,s){i=i.filterEntries(e,t);let n=1;const r=()=>{0===--n&&s()};for(const[e,t,s]of i.matches.entries())this.#$t(e)||(n++,this.match(e,t,s).then(()=>r()));for(const[e,t]of i.subwalks.entries())n++,this.walkCB2(e,t,i.child(),r);r()}walkCBSync(e,t,i){this.signal?.aborted&&i(),this.walkCB2Sync(e,t,new Ni(this.opts),i)}walkCB2Sync(e,t,i,s){if(this.#Dt(e))return s();if(this.signal?.aborted&&s(),this.paused)return void this.onResume(()=>this.walkCB2Sync(e,t,i,s));i.processPatterns(e,t);let n=1;const r=()=>{0===--n&&s()};for(const[e,t,s]of i.matches.entries())this.#$t(e)||this.matchSync(e,t,s);for(const e of i.subwalkTargets()){if(this.maxDepth!==1/0&&e.depth()>=this.maxDepth)continue;n++;const t=e.readdirSync();this.walkCB3Sync(e,t,i,r)}r()}walkCB3Sync(e,t,i,s){i=i.filterEntries(e,t);let n=1;const r=()=>{0===--n&&s()};for(const[e,t,s]of i.matches.entries())this.#$t(e)||this.matchSync(e,t,s);for(const[e,t]of i.subwalks.entries())n++,this.walkCB2Sync(e,t,i.child(),r);r()}}class Li extends Fi{matches=new Set;constructor(e,t,i){super(e,t,i)}matchEmit(e){this.matches.add(e)}async walk(){if(this.signal?.aborted)throw this.signal.reason;return this.path.isUnknown()&&await this.path.lstat(),await new Promise((e,t)=>{this.walkCB(this.path,this.patterns,()=>{this.signal?.aborted?t(this.signal.reason):e(this.matches)})}),this.matches}walkSync(){if(this.signal?.aborted)throw this.signal.reason;return this.path.isUnknown()&&this.path.lstatSync(),this.walkCBSync(this.path,this.patterns,()=>{if(this.signal?.aborted)throw this.signal.reason}),this.matches}}class Vi extends Fi{results;constructor(e,t,i){super(e,t,i),this.results=new ni({signal:this.signal,objectMode:!0}),this.results.on("drain",()=>this.resume()),this.results.on("resume",()=>this.resume())}matchEmit(e){this.results.write(e),this.results.flowing||this.pause()}stream(){const e=this.path;return e.isUnknown()?e.lstat().then(()=>{this.walkCB(e,this.patterns,()=>this.results.end())}):this.walkCB(e,this.patterns,()=>this.results.end()),this.results}streamSync(){return this.path.isUnknown()&&this.path.lstatSync(),this.walkCBSync(this.path,this.patterns,()=>this.results.end()),this.results}}const Bi="object"==typeof process&&process&&"string"==typeof process.platform?process.platform:"linux";class zi{absolute;cwd;root;dot;dotRelative;follow;ignore;magicalBraces;mark;matchBase;maxDepth;nobrace;nocase;nodir;noext;noglobstar;pattern;platform;realpath;scurry;stat;signal;windowsPathsNoEscape;withFileTypes;includeChildMatches;opts;patterns;constructor(e,t){if(!t)throw new TypeError("glob options required");if(this.withFileTypes=!!t.withFileTypes,this.signal=t.signal,this.follow=!!t.follow,this.dot=!!t.dot,this.dotRelative=!!t.dotRelative,this.nodir=!!t.nodir,this.mark=!!t.mark,t.cwd?(t.cwd instanceof URL||t.cwd.startsWith("file://"))&&(t.cwd=(0,Ze.fileURLToPath)(t.cwd)):this.cwd="",this.cwd=t.cwd||"",this.root=t.root,this.magicalBraces=!!t.magicalBraces,this.nobrace=!!t.nobrace,this.noext=!!t.noext,this.realpath=!!t.realpath,this.absolute=t.absolute,this.includeChildMatches=!1!==t.includeChildMatches,this.noglobstar=!!t.noglobstar,this.matchBase=!!t.matchBase,this.maxDepth="number"==typeof t.maxDepth?t.maxDepth:1/0,this.stat=!!t.stat,this.ignore=t.ignore,this.withFileTypes&&void 0!==this.absolute)throw new Error("cannot set absolute and withFileTypes:true");if("string"==typeof e&&(e=[e]),this.windowsPathsNoEscape=!!t.windowsPathsNoEscape||!1===t.allowWindowsEscape,this.windowsPathsNoEscape&&(e=e.map(e=>e.replace(/\\/g,"/"))),this.matchBase){if(t.noglobstar)throw new TypeError("base matching requires globstar");e=e.map(e=>e.includes("/")?e:`./**/${e}`)}if(this.pattern=e,this.platform=t.platform||Bi,this.opts={...t,platform:this.platform},t.scurry){if(this.scurry=t.scurry,void 0!==t.nocase&&t.nocase!==t.scurry.nocase)throw new Error("nocase option contradicts provided scurry option")}else{const e="win32"===t.platform?Ti:"darwin"===t.platform?ki:t.platform?Oi:Ri;this.scurry=new e(this.cwd,{nocase:t.nocase,fs:t.fs})}this.nocase=this.scurry.nocase;const i="darwin"===this.platform||"win32"===this.platform,s={...t,dot:this.dot,matchBase:this.matchBase,nobrace:this.nobrace,nocase:this.nocase,nocaseMagicOnly:i,nocomment:!0,noext:this.noext,nonegate:!0,optimizationLevel:2,platform:this.platform,windowsPathsNoEscape:this.windowsPathsNoEscape,debug:!!this.opts.debug},n=this.pattern.map(e=>new Je(e,s)),[r,o]=n.reduce((e,t)=>(e[0].push(...t.set),e[1].push(...t.globParts),e),[[],[]]);this.patterns=r.map((e,t)=>{const i=o[t];if(!i)throw new Error("invalid pattern object");return new Ii(e,i,0,this.platform)})}async walk(){return[...await new Li(this.patterns,this.scurry.cwd,{...this.opts,maxDepth:this.maxDepth!==1/0?this.maxDepth+this.scurry.cwd.depth():1/0,platform:this.platform,nocase:this.nocase,includeChildMatches:this.includeChildMatches}).walk()]}walkSync(){return[...new Li(this.patterns,this.scurry.cwd,{...this.opts,maxDepth:this.maxDepth!==1/0?this.maxDepth+this.scurry.cwd.depth():1/0,platform:this.platform,nocase:this.nocase,includeChildMatches:this.includeChildMatches}).walkSync()]}stream(){return new Vi(this.patterns,this.scurry.cwd,{...this.opts,maxDepth:this.maxDepth!==1/0?this.maxDepth+this.scurry.cwd.depth():1/0,platform:this.platform,nocase:this.nocase,includeChildMatches:this.includeChildMatches}).stream()}streamSync(){return new Vi(this.patterns,this.scurry.cwd,{...this.opts,maxDepth:this.maxDepth!==1/0?this.maxDepth+this.scurry.cwd.depth():1/0,platform:this.platform,nocase:this.nocase,includeChildMatches:this.includeChildMatches}).streamSync()}iterateSync(){return this.streamSync()[Symbol.iterator]()}[Symbol.iterator](){return this.iterateSync()}iterate(){return this.stream()[Symbol.asyncIterator]()}[Symbol.asyncIterator](){return this.iterate()}}const Wi=(e,t={})=>{Array.isArray(e)||(e=[e]);for(const i of e)if(new Je(i,t).hasMagic())return!0;return!1};function ji(e,t={}){return new zi(e,t).streamSync()}function Ui(e,t={}){return new zi(e,t).stream()}function Hi(e,t={}){return new zi(e,t).walkSync()}async function Gi(e,t={}){return new zi(e,t).walk()}function Ki(e,t={}){return new zi(e,t).iterateSync()}function Yi(e,t={}){return new zi(e,t).iterate()}const qi=ji,Qi=Object.assign(Ui,{sync:ji}),Xi=Ki,Ji=Object.assign(Yi,{sync:Ki}),Zi=Object.assign(Hi,{stream:ji,iterate:Ki}),es=Object.assign(Gi,{glob:Gi,globSync:Hi,sync:Zi,globStream:Ui,stream:Qi,globStreamSync:ji,streamSync:qi,globIterate:Yi,iterate:Ji,globIterateSync:Ki,iterateSync:Xi,Glob:zi,hasMagic:Wi,escape:Me,unescape:oe});es.glob=es;class ts{item=null;prompt=null;parent=null;list=null;next=null;dep=null;explicit_dep=null;if_dep=null;if_indent_level=0;visibility=null;is_menuconfig=!1;node_type=null;filename=null;linenr=0;nextIndex;constructor(){}addChild(e){if(e.parent=this,this.list){let t=this.list;for(;t.next;)t=t.next;t.next=e}else this.list=e}getChildren(){const e=[];let t=this.list;for(;t;)e.push(t),t=t.next;return e}calculateIndent(){let e=0,t=this.parent;for(;t;)"menuconfig"!==t.node_type||t.parent?(("menu"===t.node_type||"menuconfig"===t.node_type||t.is_menuconfig||"choice"===t.node_type||"config"===t.node_type&&null!==t.list)&&e++,t=t.parent):t=t.parent;return e}shouldFlatten(){const e=this.item&&!0===this.item.isImplicitContainer;return null!==this.list&&null===this.prompt&&"choice"!==this.node_type&&!e}isIfNode(){return null===this.item&&"if"===this.node_type}clone(){const e=new ts;return e.item=this.item,e.prompt=this.prompt,e.dep=this.dep,e.is_menuconfig=this.is_menuconfig,e.node_type=this.node_type,e.filename=this.filename,e.linenr=this.linenr,e}toString(){return this.item?`MenuNode(${this.node_type}: ${this.item.name||this.item.title})`:"if"===this.node_type?`MenuNode(if: ${this.dep})`:`MenuNode(${this.node_type})`}printTree(e=0){"  ".repeat(e);let t=this.list;for(;t;)t.printTree(e+1),t=t.next}}var is;!function(e){e.SYMBOL="SYMBOL",e.STRING="STRING",e.NUMBER="NUMBER",e.AND="AND",e.OR="OR",e.NOT="NOT",e.EQUAL="EQUAL",e.UNEQUAL="UNEQUAL",e.LESS="LESS",e.LESS_EQUAL="LESS_EQUAL",e.GREATER="GREATER",e.GREATER_EQUAL="GREATER_EQUAL"}(is||(is={}));class ss{pos=0;expr="";parse(e){if(this.expr=e.trim(),this.pos=0,!this.expr)return{type:is.SYMBOL,value:"y"};const t=this.parseOr();if(this.skipWhitespace(),this.pos<this.expr.length)throw new Error(`Unexpected token at position ${this.pos}: ${this.expr.substring(this.pos)}`);return t}parseOr(){let e=this.parseAnd();for(;this.consumeToken("||");){const t=this.parseAnd();e={type:is.OR,left:e,right:t}}return e}parseAnd(){let e=this.parseNot();for(;this.consumeToken("&&");){const t=this.parseNot();e={type:is.AND,left:e,right:t}}return e}parseNot(){return this.consumeToken("!")?{type:is.NOT,left:this.parseNot()}:this.parseComparison()}parseComparison(){const e=this.parsePrimary();return this.consumeToken(">=")?{type:is.GREATER_EQUAL,left:e,right:this.parsePrimary()}:this.consumeToken("<=")?{type:is.LESS_EQUAL,left:e,right:this.parsePrimary()}:this.consumeToken("!=")?{type:is.UNEQUAL,left:e,right:this.parsePrimary()}:this.consumeToken("=")?{type:is.EQUAL,left:e,right:this.parsePrimary()}:this.consumeToken(">")?{type:is.GREATER,left:e,right:this.parsePrimary()}:this.consumeToken("<")?{type:is.LESS,left:e,right:this.parsePrimary()}:e}parsePrimary(){if(this.skipWhitespace(),"("===this.expr[this.pos]){this.pos++;const e=this.parseOr();if(this.skipWhitespace(),")"!==this.expr[this.pos])throw new Error(`Expected ')' at position ${this.pos}`);return this.pos++,e}return'"'===this.expr[this.pos]?this.parseString():this.parseSymbolOrNumber()}parseString(){this.pos++;const e=this.pos;for(;this.pos<this.expr.length&&'"'!==this.expr[this.pos];)"\\"===this.expr[this.pos]&&this.pos++,this.pos++;if(this.pos>=this.expr.length)throw new Error("Unterminated string");const t=this.expr.substring(e,this.pos);return this.pos++,{type:is.STRING,value:t}}parseSymbolOrNumber(){this.skipWhitespace();const e=this.pos;for(;this.pos<this.expr.length&&/[A-Za-z0-9_]/.test(this.expr[this.pos]);)this.pos++;if(this.pos===e)throw new Error(`Expected symbol or number at position ${this.pos}`);const t=this.expr.substring(e,this.pos);return/^\d+$/.test(t)?{type:is.NUMBER,value:parseInt(t,10)}:{type:is.SYMBOL,value:t}}exprDependsOn(e,t){const i=e=>!!e&&e.type===is.SYMBOL&&"y"===e.value,s=e=>!!e&&e.type===is.SYMBOL&&"m"===e.value,n=e=>!!e&&e.type===is.SYMBOL&&"n"===e.value,r=(e,t)=>!!e&&e.type===is.SYMBOL&&e.value===t;switch(e.type){case is.SYMBOL:return e.value===t;case is.AND:return!!e.left&&this.exprDependsOn(e.left,t)||!!e.right&&this.exprDependsOn(e.right,t);case is.OR:case is.NOT:return!1;case is.EQUAL:{const n=e.left,o=e.right;return!(!r(n,t)||!i(o)&&!s(o))||!(!r(o,t)||!i(n)&&!s(n))}case is.UNEQUAL:{const i=e.left,s=e.right;return!(!r(i,t)||!n(s))||!(!r(s,t)||!n(i))}case is.LESS:case is.LESS_EQUAL:case is.GREATER:case is.GREATER_EQUAL:case is.STRING:case is.NUMBER:default:return!1}}isPureNegation(e){switch(e.type){case is.NOT:return!0;case is.AND:return(!e.left||this.isPureNegation(e.left))&&(!e.right||this.isPureNegation(e.right));default:return!1}}toString(e){switch(e.type){case is.SYMBOL:return e.value;case is.STRING:return`"${e.value}"`;case is.NUMBER:return e.value.toString();case is.NOT:return`!${e.left?this.toString(e.left):""}`;case is.AND:return`(${e.left?this.toString(e.left):""} && ${e.right?this.toString(e.right):""})`;case is.OR:return`(${e.left?this.toString(e.left):""} || ${e.right?this.toString(e.right):""})`;case is.EQUAL:return`${e.left?this.toString(e.left):""} = ${e.right?this.toString(e.right):""}`;case is.UNEQUAL:return`${e.left?this.toString(e.left):""} != ${e.right?this.toString(e.right):""}`;case is.LESS:return`${e.left?this.toString(e.left):""} < ${e.right?this.toString(e.right):""}`;case is.LESS_EQUAL:return`${e.left?this.toString(e.left):""} <= ${e.right?this.toString(e.right):""}`;case is.GREATER:return`${e.left?this.toString(e.left):""} > ${e.right?this.toString(e.right):""}`;case is.GREATER_EQUAL:return`${e.left?this.toString(e.left):""} >= ${e.right?this.toString(e.right):""}`;default:return""}}consumeToken(e){if(this.skipWhitespace(),this.pos+e.length>this.expr.length)return!1;for(let t=0;t<e.length;t++)if(this.expr[this.pos+t]!==e[t])return!1;if("="===e||"!"===e||"<"===e||">"===e){const t=this.expr[this.pos+e.length];if("="===t||"<"===e&&"="===t||">"===e&&"="===t)return!1}return this.pos+=e.length,!0}skipWhitespace(){for(;this.pos<this.expr.length&&/\s/.test(this.expr[this.pos]);)this.pos++}}class ns{static MAX_RESULT_CACHE_SIZE=2e4;context;astCache=new Map;expressionVariableDeps=new Map;evaluationCache=new Map;contextVersion=0;symbolVersions=new Map;constructor(e={}){this.context=e}updateContext(e){let t=!1;for(const[i,s]of Object.entries(e))this.areValuesEqual(this.context[i],s)||(this.context[i]=s,t=!0,this.bumpSymbolVersion(i));t&&(this.contextVersion+=1)}setValue(e,t){this.areValuesEqual(this.context[e],t)||(this.context[e]=t,this.contextVersion+=1,this.bumpSymbolVersion(e))}getValue(e){return this.context[e]}evaluate(e){if(!e||""===e.trim())return!0;try{const t=this.normalizeExpression(e.trim()),i=this.parseExpression(t),s=this.expressionVariableDeps.get(t)||[],n=this.buildExpressionSignature(s),r=this.evaluationCache.get(t);if(r&&r.signature===n)return r.result;const o=this.evaluateNode(i);return this.evaluationCache.size>=ns.MAX_RESULT_CACHE_SIZE&&this.evaluationCache.clear(),this.evaluationCache.set(t,{signature:n,result:o}),o}catch(t){return T.warn(`Failed to evaluate condition: ${e}. Error: ${t}`),!0}}parseExpression(e){const t=this.normalizeExpression(e);if(""===t){const e={type:"LITERAL",value:!0,literalKind:"boolean",rawValue:"true"};return this.astCache.set(t,e),this.expressionVariableDeps.set(t,[]),e}const i=this.astCache.get(t);if(i)return i;const s=this.findOperator(t,"||");if(s){const e={type:"OR",left:this.parseExpression(s.left),right:this.parseExpression(s.right)};return this.astCache.set(t,e),this.expressionVariableDeps.set(t,this.collectVariableDeps(e)),e}const n=this.findOperator(t,"&&");if(n){const e={type:"AND",left:this.parseExpression(n.left),right:this.parseExpression(n.right)};return this.astCache.set(t,e),this.expressionVariableDeps.set(t,this.collectVariableDeps(e)),e}if(t.startsWith("!")){const e={type:"NOT",left:this.parseExpression(t.substring(1).trim())};return this.astCache.set(t,e),this.expressionVariableDeps.set(t,this.collectVariableDeps(e)),e}const r=this.findComparison(t);if(r){const e={type:"COMPARISON",left:this.parseExpression(r.left),right:this.parseExpression(r.right),operator:r.operator};return this.astCache.set(t,e),this.expressionVariableDeps.set(t,this.collectVariableDeps(e)),e}const o=this.parseLiteral(t);return this.astCache.set(t,o),this.expressionVariableDeps.set(t,this.collectVariableDeps(o)),o}collectVariableDeps(e){const t=new Set,i=[e];for(;i.length>0;){const e=i.pop();e&&("VARIABLE"===e.type&&e.variable&&t.add(e.variable),e.left&&i.push(e.left),e.right&&i.push(e.right))}return Array.from(t).sort()}buildExpressionSignature(e){if(!e||0===e.length)return"const";const t=new Array(e.length+1);t[0]=`v${this.contextVersion}`;for(let i=0;i<e.length;i++){const s=e[i],n=this.symbolVersions.get(s)||0;t[i+1]=`${s}:${n}`}return t.join("|")}bumpSymbolVersion(e){const t=this.symbolVersions.get(e)||0;this.symbolVersions.set(e,t+1)}areValuesEqual(e,t){return e===t}normalizeExpression(e){if(!e)return"";let t=e.trim();return t=this.removeOuterParentheses(t),t}removeOuterParentheses(e){let t=e.trim();for(;t.startsWith("(")&&t.endsWith(")");){let e=0,i=!0;for(let s=0;s<t.length;s++){const n=t[s];if("("===n)e++;else if(")"===n&&(e--,0===e&&s<t.length-1)){i=!1;break}}if(!i)break;t=t.substring(1,t.length-1).trim()}return t}findOperator(e,t){let i=0,s=-1;for(let n=0;n<e.length-t.length+1;n++)"("===e[n]?i++:")"===e[n]?i--:0===i&&e.substring(n,n+t.length)===t&&(s=n);return-1!==s?{left:e.substring(0,s).trim(),right:e.substring(s+t.length).trim()}:null}findComparison(e){const t=["!=",">=","<=","=",">","<"];for(const i of t){let t=0,s=-1;for(let n=e.length-i.length;n>=0;n--)if(")"===e[n])t++;else if("("===e[n])t--;else if(0===t&&e.substring(n,n+i.length)===i){s=n;break}if(-1!==s)return{left:e.substring(0,s).trim(),right:e.substring(s+i.length).trim(),operator:i}}return null}parseLiteral(e){return(e=e.trim()).startsWith('"')&&e.endsWith('"')?{type:"LITERAL",value:e.substring(1,e.length-1),literalKind:"string",rawValue:e}:/^-?\d+$/.test(e)?{type:"LITERAL",value:parseInt(e),literalKind:"number",rawValue:e}:/^0x[0-9a-fA-F]+$/.test(e)?{type:"LITERAL",value:parseInt(e,16),literalKind:"hex",rawValue:e}:"m"===e||"M"===e?{type:"LITERAL",value:"m",literalKind:"tristate",rawValue:e}:"y"===e||"true"===e?{type:"LITERAL",value:!0,literalKind:"y"===e?"tristate":"boolean",rawValue:e}:"n"===e||"false"===e?{type:"LITERAL",value:!1,literalKind:"n"===e?"tristate":"boolean",rawValue:e}:{type:"VARIABLE",variable:e}}evaluateNode(e){switch(e.type){case"AND":return this.evaluateNode(e.left)&&this.evaluateNode(e.right);case"OR":return this.evaluateNode(e.left)||this.evaluateNode(e.right);case"NOT":return!this.evaluateNode(e.left);case"COMPARISON":return this.evaluateComparison(e);case"VARIABLE":return this.evaluateVariable(e.variable);case"LITERAL":return this.toLiteral(e.value);default:return T.warn(`Unknown node type: ${e.type}`),!0}}evaluateComparison(e){const t=this.getNodeValue(e.left),i=this.getNodeValue(e.right),{left:s,right:n}=this.normalizeComparisonOperands(t,i,e.left,e.right);switch(e.operator){case"=":return s===n;case"!=":return s!==n;case">":return this.toNumber(s)>this.toNumber(n);case"<":return this.toNumber(s)<this.toNumber(n);case">=":return this.toNumber(s)>=this.toNumber(n);case"<=":return this.toNumber(s)<=this.toNumber(n);default:return T.warn(`Unknown comparison operator: ${e.operator}`),!0}}getNodeValue(e){switch(e.type){case"VARIABLE":return this.context[e.variable];case"LITERAL":return e.value;default:return this.evaluateNode(e)}}evaluateVariable(e){const t=this.context[e];return this.toBoolean(t)}toBoolean(e){if(null==e)return!1;if("boolean"==typeof e)return e;if("number"==typeof e)return 0!==e;if("string"==typeof e){const t=e.trim();if(""===t)return!1;const i=t.toLowerCase();return"y"===i||"yes"===i||"true"===i||"on"===i||"m"===i||"n"!==i&&"no"!==i&&"false"!==i&&"off"!==i&&(/^0x[0-9a-f]+$/i.test(t)?0!==parseInt(t,16):!/^-?\d+$/.test(t)||0!==parseInt(t,10))}return Boolean(e)}toLiteral(e){return"boolean"==typeof e?e:this.toBoolean(e)}toNumber(e){if("number"==typeof e)return e;if("string"==typeof e){const t=e.toLowerCase();return"y"===t?2:"m"===t?1:"n"===t?0:e.startsWith("0x")?parseInt(e,16):parseInt(e)||0}return"boolean"==typeof e&&e?1:0}normalizeComparisonValue(e,t){if(null==e)return e;if("boolean"==typeof e)return e?"y":"n";if("number"==typeof e)return e;if("string"==typeof e){const i=e.trim();if(t?.forceString)return i;const s=i.toLowerCase();if("y"===s||"m"===s||"n"===s)return s;if("true"===s)return"y";if("false"===s)return"n";const n=this.tryConvertStringToNumber(i);return null!==n?n:i}return e}normalizeComparisonOperands(e,t,i,s){const n=this.isPlainStringValue(e),r=this.isPlainStringValue(t),o=this.isStringLiteral(i)||this.isStringLiteral(s)||n||r;let a=this.normalizeComparisonValue(e,{forceString:o}),l=this.normalizeComparisonValue(t,{forceString:o});return n&&"number"==typeof l&&(l=this.numericLiteralToString(s,l)),r&&"number"==typeof a&&(a=this.numericLiteralToString(i,a)),"number"==typeof a&&this.isTristateString(l)?l=this.tristateToNumber(l):"number"==typeof l&&this.isTristateString(a)&&(a=this.tristateToNumber(a)),{left:a,right:l}}isPlainStringValue(e){if("string"!=typeof e)return!1;const t=e.trim(),i=t.toLowerCase();return"y"!==i&&"m"!==i&&"n"!==i&&"true"!==i&&"false"!==i&&"on"!==i&&"off"!==i&&null===this.tryConvertStringToNumber(t)}isTristateString(e){if("string"!=typeof e)return!1;const t=e.toLowerCase();return"y"===t||"m"===t||"n"===t}isStringLiteral(e){return!!e&&"LITERAL"===e.type&&"string"===e.literalKind}numericLiteralToString(e,t){if(e&&"LITERAL"===e.type){if("hex"===e.literalKind&&e.rawValue)return e.rawValue;if("number"===e.literalKind&&e.rawValue)return e.rawValue}return String(t)}tryConvertStringToNumber(e){if(""===e)return null;const t=e.startsWith("-")?-1:1,i="+"===e[0]||"-"===e[0]?e.substring(1):e;return""===i?null:/^0[xX][0-9a-fA-F]+$/.test(i)?t*parseInt(i.substring(2),16):/^0[bB][01]+$/.test(i)?t*parseInt(i.substring(2),2):/^0[oO][0-7]+$/.test(i)?t*parseInt(i.substring(2),8):/^0+$/.test(i)?0:/^[1-9][0-9]*$/.test(i)?t*parseInt(i,10):null}tristateToNumber(e){const t=e.toLowerCase();return"y"===t?2:"m"===t?1:0}}class rs{evaluator;dependencies=new Map;configValues={};allMenus=[];menuById=new Map;menuParentByChildId=new Map;menuByName=new Map;menusByName=new Map;modulesSymbolName=null;dependencyClampCache=new Map;lastAffectedMenuIds=new Set;constructor(){this.evaluator=new ns}tristateOrder=["n","m","y"];initialize(e){T.debugVisibility(`Initializing with ${e.length} menus`),this.allMenus=e,this.rebuildIndexes(e),this.modulesSymbolName=this.detectModulesSymbolName(e),this.buildDependencyGraph(e),this.extractConfigValues(e),this.dependencyClampCache.clear(),T.debugVisibility("Config values before context update:"),T.debugVisibility(`  BSP_USING_UART: ${this.configValues.BSP_USING_UART}`),T.debugVisibility(`  BSP_USING_UART0: ${this.configValues.BSP_USING_UART0}`),this.evaluator.updateContext(this.configValues),this.applyConfigDefaults();const t=new Set;this.applyChoiceDefaults(t),t.size>0&&t.forEach(e=>{this.propagateDefaultsFrom(e)}),this.enforceDependencyBounds(),this.processInitialSelectStatements(),this.applyImplyConstraints(),this.updateTristateAllowedValues(),this.enforceDependencyBounds(),this.updateAllVisibility(),this.lastAffectedMenuIds=this.collectAllMenuIds(),this.updateReadonlyStates();const i=this.findMenuByName("RT_USING_FDT"),s=this.findMenuByName("RT_USING_FDTLIB");(i||s)&&T.debugVisibility(()=>`[FDT_DEBUG] Initialize: RT_USING_FDT=${i?i.value:"N/A"}, RT_USING_FDTLIB=${s?s.value:"N/A"}`),T.debugVisibility("Initialization complete:"),T.debugVisibility(`  - Dependencies: ${this.dependencies.size}`),T.debugVisibility(`  - Config values: ${Object.keys(this.configValues).length}`),this.logVisibilityState()}enforceDependencyBounds(e){const t=e??new Set,i=e=>{if(e.name&&e.dependsOn&&(e.type===h.bool||e.type===h.tristate)){let i=!0;try{i=this.evaluator.evaluate(e.dependsOn)}catch(t){T.warn(`Failed to evaluate dependency bound for ${e.name}: ${e.dependsOn}. Error: ${t}`),i=!0}const s=e.id||e.name;if(i){if(s&&this.dependencyClampCache.has(s)){const i=this.dependencyClampCache.get(s);if(this.dependencyClampCache.delete(s),i){const s=i.value;this.areMenuValuesEqual(e.value,s,e.type)?e.name&&(this.configValues[e.name]=s):(e.value=s,e.name&&(this.configValues[e.name]=s,this.evaluator.setValue(e.name,s),this.markMenuAndPeersChanged(e,t))),void 0!==i.isDefaultValue&&(e.isDefaultValue=i.isDefaultValue),void 0!==i.autoSelectedValue&&(e.autoSelectedValue=i.autoSelectedValue),e.defaults&&e.defaults.length>0&&this.reapplyDefaultsForMenu(e)&&this.markMenuAndPeersChanged(e,t)}}}else if(s&&!this.dependencyClampCache.has(s)&&this.dependencyClampCache.set(s,{value:e.value,isDefaultValue:e.isDefaultValue,autoSelectedValue:e.autoSelectedValue}),e.type===h.bool){const i=!1;this.areMenuValuesEqual(e.value,i,e.type)?this.configValues[e.name]=i:(e.value=i,this.configValues[e.name]=i,this.evaluator.setValue(e.name,i),this.markMenuAndPeersChanged(e,t))}else if(e.type===h.tristate){const i="n";this.areMenuValuesEqual(e.value,i,e.type)?this.configValues[e.name]=i:(e.value=i,this.configValues[e.name]=i,this.evaluator.setValue(e.name,i),this.markMenuAndPeersChanged(e,t))}}e.children&&e.children.forEach(i)};return this.allMenus.forEach(i),this.evaluator.updateContext(this.configValues),t}applyChoiceDefaults(e){const t=i=>{if("choice"===i.type&&i.children&&i.children.length>0){const t=new Set(i.children.map(e=>e.name));let s=null,n=null;for(const e of i.children)e.type===h.bool&&!0===e.value&&t.has(e.name)&&(s=e.name,n="child");if(s&&T.debugVisibility(`[CHOICE_DEFAULT] 从子项值反推 choice 选择: ${s}`),!s&&i.value&&"string"==typeof i.value&&t.has(i.value))s=i.value,n="value";else if(!s){if(i.defaults&&i.defaults.length>0){const e=this.selectEffectiveDefault(i);e&&"string"==typeof e.value&&t.has(e.value)&&(s=e.value,n="default")}s||(s=i.children[0].name,n="fallback")}if(s&&(i.value!==s&&(i.value=s,e&&e.add(i.id)),"child"===n?i.isDefaultValue=!1:"default"===n||"fallback"===n?i.isDefaultValue=!0:"value"===n&&void 0===i.isDefaultValue&&(i.isDefaultValue=!1)),s)for(const t of i.children){const i=t.name===s;t.type===h.bool&&(this.configValues[t.name]===i&&t.value===i||(this.configValues[t.name]=i,t.value=i,this.evaluator.setValue(t.name,i),"child"===n?t.isDefaultValue=!1:"default"!==n&&"fallback"!==n||(t.isDefaultValue=i),e&&e.add(t.id)))}}i.children&&i.children.forEach(t)};this.allMenus.forEach(t),this.evaluator.updateContext(this.configValues)}parseDefaultForType(e,t){if(null==e)return e;const i=this.resolveDefaultReference(e),s="string"==typeof i?i.trim():i;switch(t){case h.bool:if("boolean"==typeof i)return i;if("number"==typeof i)return 0!==i;if("string"==typeof s){const e=s.toLowerCase();if("y"===e||"yes"===e||"true"===e||"1"===e)return!0;if("n"===e||"no"===e||"false"===e||"0"===e)return!1}return Boolean(i);case h.tristate:if("string"==typeof i){const e=i.toLowerCase();if("y"===e||"m"===e||"n"===e)return e;if("true"===e)return"y";if("false"===e)return"n"}return"boolean"==typeof i?i?"y":"n":"number"==typeof i?i>=2?"y":1===i?"m":"n":"n";case h.int:if("number"==typeof i)return i;if("string"==typeof s){const e=parseInt(s,10);return Number.isNaN(e)?0:e}return 0;case h.hex:if("string"==typeof s){if(s.startsWith("0x")||s.startsWith("0X"))return s;const e=parseInt(s,10);return Number.isNaN(e)?"0x0":`0x${e.toString(16)}`}return"number"==typeof i?`0x${i.toString(16)}`:"0x0";case h.string:return"string"==typeof i?i.replace(/^"(.*)"$/,"$1"):null==i?"":String(i);default:return i}}resolveDefaultReference(e){if("string"!=typeof e)return e;const t=e.trim();return/^".*"$/.test(t)?e:/^[A-Z][A-Z0-9_]*$/.test(t)&&Object.prototype.hasOwnProperty.call(this.configValues,t)?this.configValues[t]:e}getFallbackValueForType(e){switch(e){case h.bool:return!1;case h.tristate:return"n";case h.int:return 0;case h.hex:return"0x0";case h.string:return"";default:return null}}selectEffectiveDefault(e){if(!e.defaults||0===e.defaults.length)return null;for(const t of e.defaults){let i=!0;if(t.condition&&t.condition.trim().length>0)try{i=this.evaluator.evaluate(t.condition)}catch(s){i=!1,T.debugVisibility(`[DEFAULT_EVAL] 评估失败: ${e.name} default if "${t.condition}" -> ${s}`)}if(i)return t}return null}areMenuValuesEqual(e,t,i){return i===h.int?Number(e)===Number(t):e===t}applyConfigDefaults(){let e=0;const t=i=>{if(!i.name||i.type===h.menu)return void(i.children&&i.children.forEach(t));const s=!!(i.defaults&&i.defaults.length>0),n=void 0===i.value||null===i.value,r=s?this.selectEffectiveDefault(i):null,o=r?this.parseDefaultForType(r.value,i.type):this.getFallbackValueForType(i.type);n?(i.value=o,this.configValues[i.name]=o,this.evaluator.setValue(i.name,o),i.isDefaultValue=!0,e++,r&&T.debugVisibility(`[DEFAULT_APPLY] ${i.name} <- ${JSON.stringify(o)}${r.condition?` (if ${r.condition})`:""}`)):void 0===i.isDefaultValue&&(i.isDefaultValue=!!s&&null!==r),i.children&&i.children.forEach(t)};this.allMenus.forEach(t),e>0&&this.evaluator.updateContext(this.configValues),T.debugVisibility(`[DEFAULT_APPLY] 已应用 ${e} 个配置项默认值`)}reapplyDefaultsForMenu(e){if(!e.name||e.type===h.menu)return!1;if(e.autoSelectedValue)return!1;if(!1===e.isDefaultValue)return!1;const t=e.defaults&&e.defaults.length>0?this.selectEffectiveDefault(e):null,i=t?this.parseDefaultForType(t.value,e.type):this.getFallbackValueForType(e.type);if(this.areMenuValuesEqual(e.value,i,e.type))return!1;const s=e.value;return e.value=i,this.configValues[e.name]=i,this.evaluator.setValue(e.name,i),e.isDefaultValue=!0,e.type===h.bool&&this.processSelectStatements(e,!0===i),T.debugVisibility(`[DEFAULT_REAPPLY] ${e.name}: ${JSON.stringify(s)} -> ${JSON.stringify(i)}${t?.condition?` (if ${t.condition})`:""}`),!0}propagateDefaultsFrom(e){const t=new Set,i=[e],s=new Set;let n=0;for(;n<i.length;){const e=i[n++];if(s.has(e))continue;s.add(e);const r=this.dependencies.get(e);if(r)for(const e of r.dependents){const s=this.findMenuById(e);s&&(this.reapplyDefaultsForMenu(s)&&(this.markMenuAndPeersChanged(s,t),i.push(e)))}}return t}updateValue(e,t){T.debugVisibility(`Updating value for ${e} to ${t}`);const i=this.findMenuById(e),s=new Set,n=!e||!i;let r=new Set;if(i){const e=this.configValues[i.name];if(i.value=t,this.configValues[i.name]=t,this.evaluator.setValue(i.name,t),i.isDefaultValue=!1,this.markMenuAndPeersChanged(i,s),void 0!==i.autoSelectedValue&&(T.debugVisibility(`Clearing auto-selected flag for ${i.name} due to user modification`),i.autoSelectedValue=void 0,i.autoSelectedPreviousValue=void 0,i.autoSelectedPreviousWasDefault=void 0),i.type===h.choice&&(r=this.applyChoiceSelection(i,t)),this.syncSymbolState(i),i.type===h.bool){const e=!0===t;this.processSelectStatements(i,e,s)}if(T.debugVisibility(`Updated ${i.name} from ${e} to ${t}`),"RT_USING_FDT"===i.name){const e=this.findMenuByName("RT_USING_FDTLIB");e&&T.debugVisibility(()=>`[FDT_DEBUG] RT_USING_FDT -> ${t}; RT_USING_FDTLIB before visibility update: value=${e.value}, dependsOn=${e.dependsOn||"y"}`)}}this.propagateDefaultsFrom(e).forEach(e=>s.add(e)),r.forEach(e=>{this.propagateDefaultsFrom(e).forEach(e=>s.add(e)),s.add(e)});const o=new Set;this.applyChoiceDefaults(o),o.forEach(e=>{this.propagateDefaultsFrom(e).forEach(e=>s.add(e))}),o.forEach(e=>s.add(e)),this.enforceDependencyBounds(s);const a=this.applyImplyConstraints();this.enforceDependencyBounds(s),a.forEach(e=>s.add(e)),this.updateTristateAllowedValues().forEach(e=>s.add(e));const l=n?this.collectAllMenuIds():this.collectAffectedItemsFromSeeds(s);for(const e of l)this.updateItemVisibility(e);const c=n?this.collectAllMenuIds():this.collectReadonlyCandidateIds(l);this.updateReadonlyStates(c).forEach(e=>l.add(e)),T.debugVisibility("Visibility update completed"),this.lastAffectedMenuIds=new Set(l);const u=this.findMenuByName("RT_USING_FDT"),d=this.findMenuByName("RT_USING_FDTLIB");return(u||d)&&T.debugVisibility(()=>`[FDT_DEBUG] After updateValue(): RT_USING_FDT=${u?u.value:"N/A"}, RT_USING_FDTLIB=${d?d.value:"N/A"}`),this.allMenus}consumeLastAffectedMenuIds(){const e=this.lastAffectedMenuIds;return this.lastAffectedMenuIds=new Set,e}applyChoiceSelection(e,t){const i=new Set;if(!e.children||0===e.children.length)return i;if("string"!=typeof t||0===t.trim().length)return i;const s=t.trim();if(!e.children.find(e=>e.name===s))return i;e.value=s,e.isDefaultValue=!1;for(const t of e.children){if(t.type!==h.bool&&t.type!==h.tristate)continue;const e=t.name===s,n=e;t.name&&(t.value===n&&this.configValues[t.name]===n||(t.value=n,this.configValues[t.name]=n,this.evaluator.setValue(t.name,n),this.markMenuAndPeersChanged(t,i))),t.isDefaultValue=!1,t.autoSelectedValue=void 0,t.autoSelectedPreviousValue=void 0,t.autoSelectedPreviousWasDefault=void 0,this.syncSymbolState(t),t.type===h.bool&&this.processSelectStatements(t,e,i)}return i}getContext(){return{...this.configValues}}getEvaluator(){return this.evaluator}buildDependencyGraph(e){this.dependencies.clear();const t=e=>{let i=this.dependencies.get(e.id);if(i?i.dependsOn=e.dependsOn||i.dependsOn||"":(i={configId:e.id,dependsOn:e.dependsOn||"",dependents:new Set},this.dependencies.set(e.id,i)),e.dependsOn){const t=this.extractReferencedConfigs(e.dependsOn);for(const i of t){const t=this.findMenuByName(i);if(t){let i=this.dependencies.get(t.id);i||(i={configId:t.id,dependsOn:t.dependsOn||"",dependents:new Set},this.dependencies.set(t.id,i)),i.dependents.add(e.id)}}}if(e.defaults&&e.defaults.length>0)for(const t of e.defaults){const i=new Set;if(t.condition&&t.condition.trim().length>0&&this.extractReferencedConfigs(t.condition).forEach(e=>i.add(e)),"string"==typeof t.value&&t.value.trim().length>0){const e=t.value.trim().replace(/^"(.*)"$/,"$1");this.extractReferencedConfigs(e).forEach(e=>i.add(e))}i.forEach(t=>{const i=this.findMenuByName(t);if(!i)return;let s=this.dependencies.get(i.id);s||(s={configId:i.id,dependsOn:i.dependsOn||"",dependents:new Set},this.dependencies.set(i.id,s)),s.dependents.add(e.id)})}e.children&&e.children.forEach(t)};e.forEach(t)}extractConfigValues(e){const t=e=>{if(e.name&&void 0!==e.value&&null!==e.value)this.configValues[e.name]=e.value;else if(e.name&&e.type!==h.menu)switch(e.type){case h.bool:this.configValues[e.name]=!1;break;case h.tristate:this.configValues[e.name]="n";break;case h.int:this.configValues[e.name]=0;break;case h.string:this.configValues[e.name]="";break;case h.hex:this.configValues[e.name]="0x0";break;default:this.configValues[e.name]=null}e.children&&e.children.forEach(t)};e.forEach(t)}extractReferencedConfigs(e){const t=new Set,i=e.match(/\b[A-Z][A-Z0-9_]*\b/g);return i&&i.forEach(e=>{this.isKeyword(e)||t.add(e)}),Array.from(t)}isKeyword(e){return new Set(["TRUE","FALSE","Y","N","M"]).has(e.toUpperCase())}rebuildIndexes(e){this.menuById.clear(),this.menuParentByChildId.clear(),this.menuByName.clear(),this.menusByName.clear();const t=e.map(e=>({menu:e,parentId:null}));for(;t.length>0;){const e=t.pop();if(!e||!e.menu)continue;const i=e.menu;if(i.id&&(this.menuById.set(i.id,i),this.menuParentByChildId.set(i.id,e.parentId)),i.name){this.menuByName.has(i.name)||this.menuByName.set(i.name,i);const e=this.menusByName.get(i.name)??[];e.push(i),this.menusByName.set(i.name,e)}if(i.children&&i.children.length>0)for(let e=0;e<i.children.length;e++)t.push({menu:i.children[e],parentId:i.id})}}findMenuById(e){return e?this.menuById.get(e)??null:null}detectModulesSymbolName(e){let t=null;const i=e=>{for(const s of e)if(s){if(!t&&s.name&&s.optionModules)return void(t=s.name);if(s.children&&s.children.length>0&&(i(s.children),t))return}};if(i(e),!t){const e=this.findMenuByName("MODULES");e&&e.name&&(t=e.name)}return t?T.debugVisibility(`[MODULES] Using modules symbol: ${t}`):T.debugVisibility("[MODULES] No modules symbol detected; module support disabled by default"),t}findMenuByName(e){return e?this.menuByName.get(e)??null:null}getMenusByName(e){return e?this.menusByName.get(e)??[]:[]}mergeSelectedByForName(e){const t=new Set;for(const i of this.getMenusByName(e))i.selectedBy&&i.selectedBy.forEach(e=>t.add(e));return Array.from(t)}syncSymbolState(e){if(!e.name)return;const t=this.getMenusByName(e.name);if(t.length<=1)return;const i=this.mergeSelectedByForName(e.name);for(const s of t)s!==e&&(s.value=e.value,s.isDefaultValue=e.isDefaultValue,s.autoSelectedValue=e.autoSelectedValue,s.autoSelectedPreviousValue=e.autoSelectedPreviousValue,s.autoSelectedPreviousWasDefault=e.autoSelectedPreviousWasDefault,s.selectedBy=[...i])}normalizeTristateValue(e){if("string"==typeof e){const t=e.toLowerCase();return"y"===t||"m"===t||"n"===t?t:"true"===t||"2"===t?"y":"1"===t?"m":"n"}return"number"==typeof e?e>=2?"y":1===e?"m":"n":"boolean"==typeof e&&e?"y":"n"}clampTristateValue(e,t){const i=this.tristateOrder.indexOf(t);if(-1===i)return e[0];for(let t=i;t<this.tristateOrder.length;t++){const i=this.tristateOrder[t];if(e.includes(i))return i}for(let t=i-1;t>=0;t--){const i=this.tristateOrder[t];if(e.includes(i))return i}return e[0]}getMenuTriStrength(e){if(!e)return 0;const t=e.value;return e.type===h.bool?!0===t||"y"===t||2===t?2:0:e.type===h.tristate?"y"===t||!0===t||2===t?2:"m"===t||1===t?1:0:0}setMenuStrength(e,t){if(e&&e.name){if(e.type===h.bool){const i=t>0;return e.value!==i&&(e.value=i,this.configValues[e.name]=i,this.evaluator.setValue(e.name,i)),void(e.autoImpliedValue=i)}if(e.type===h.tristate){const i=t>=2?"y":1===t?"m":"n";return e.value!==i&&(e.value=i,this.configValues[e.name]=i,this.evaluator.setValue(e.name,i)),void(t>0&&(e.autoImpliedValue=i))}}}applyImplyConstraints(){const e=new Map,t=new Set,i=new Set,s=i=>{if(i.implies&&i.implies.length>0){const s=this.getMenuTriStrength(i);if(s>0)for(const n of i.implies){const r=i.implyConditions?.[n];if(r&&!this.safeEval(r))continue;let o=s;i.type===h.bool&&o>0&&(o=2);const a=e.get(n)??0,l=Math.max(a,o);e.set(n,l),t.add(n)}}i.children&&i.children.forEach(s)};this.allMenus.forEach(s),e.forEach((e,t)=>{const s=this.findMenuByName(t);s&&e>this.getMenuTriStrength(s)&&(this.setMenuStrength(s,e),s.id&&i.add(s.id))});const n=e=>{void 0!==e.autoImpliedValue&&e.name&&!t.has(e.name)&&(e.autoImpliedValue=void 0),e.children&&e.children.forEach(n)};return this.allMenus.forEach(n),i.size>0&&this.evaluator.updateContext(this.configValues),i}updateTristateAllowedValues(){const e=new Set,t=this.isModulesEnabled(),i=e=>{if(e.type!==h.tristate)return;const i=new Set(this.tristateOrder);t||i.delete("m");const s=e.autoImpliedValue;let n;if("string"==typeof s){const e=s.toLowerCase();"y"===e?n="y":"m"===e&&(n="m")}else!0===s&&(n="y");"y"===n?i.delete("m"):"m"===n&&(i.delete("n"),i.add("m")),e.isReadonly&&"y"===e.value&&(i.delete("n"),i.delete("m"));const r=this.tristateOrder.filter(e=>i.has(e));return r.length>0?r:void 0},s=t=>{for(const n of t){const t=i(n);if(t){if(n.allowedTristateValues=t,n.name){const i=this.normalizeTristateValue(n.value);if(!t.includes(i)){const s=this.clampTristateValue(t,i);n.value!==s&&(T.debugVisibility(`[MODULES] Adjusting ${n.name} from ${n.value} -> ${s} due to modules constraints`),n.value=s,this.markMenuAndPeersChanged(n,e)),this.configValues[n.name]=s,this.evaluator.setValue(n.name,s),!1!==n.isDefaultValue&&(n.isDefaultValue=!0)}}}else n.allowedTristateValues&&delete n.allowedTristateValues;n.children&&s(n.children)}};return s(this.allMenus),e}isModulesEnabled(){if(!this.modulesSymbolName)return!1;const e=this.configValues[this.modulesSymbolName];if(null==e)return!1;if("boolean"==typeof e)return e;if("number"==typeof e)return e>=1;if("string"==typeof e){const t=e.toLowerCase();return"y"===t||"yes"===t||"true"===t||"1"===t||"m"===t||"2"===t}return!1}collectAllMenuIds(){return new Set(this.menuById.keys())}markMenuAndPeersChanged(e,t){if(!e)return;if(e.id&&t.add(e.id),!e.name)return;const i=this.getMenusByName(e.name);for(const e of i)e.id&&t.add(e.id)}collectAffectedItemsFromSeeds(e){const t=new Set,i=[];let s=0;const n=e=>{e&&!t.has(e)&&(t.add(e),i.push(e))};for(const t of e)n(t);for(;s<i.length;){const e=i[s++];if(!e)continue;const t=this.dependencies.get(e);t&&t.dependents.forEach(e=>n(e));const r=this.findMenuById(e);if(r?.name){const e=this.getMenusByName(r.name);for(const t of e)n(t.id)}let o=this.menuParentByChildId.get(e)??null;for(;o;)n(o),o=this.menuParentByChildId.get(o)??null}return t}collectReadonlyCandidateIds(e){const t=new Set,i=[];let s=0;const n=e=>{e&&!t.has(e)&&(t.add(e),i.push(e))},r=e=>{if(e&&(n(e.id),e.name)){const t=this.getMenusByName(e.name);for(const e of t)n(e.id)}};for(const t of e)n(t);for(;s<i.length;){const e=i[s++];if(!e)continue;const t=this.findMenuById(e);if(t){if(t.select&&t.select.length>0)for(const e of t.select){const t=this.getMenusByName(e);for(const e of t)r(e)}if(t.selectedBy&&t.selectedBy.length>0)for(const e of t.selectedBy){const t=this.getMenusByName(e);for(const e of t)r(e)}}}return t}processInitialSelectStatements(){T.debugSelect("[INITIAL_SELECT] Processing initial select statements...");let e=0,t=0;const i=s=>{if(e++,"bool"===s.type&&this.isSelectorEffectivelyEnabled(s)&&s.select&&s.select.length>0?(t++,T.debugSelect(`[INITIAL_SELECT] Processing ${s.name} (enabled with ${s.select.length} select targets)`),this.processSelectStatements(s,!0)):"bool"===s.type&&s.select&&s.select.length>0&&T.debugSelect(`[INITIAL_SELECT] Skipping ${s.name} (value=${s.value}, deps=${s.dependsOn||"(none)"}, has ${s.select.length} select targets but not effectively enabled)`),"bool"===s.type&&!s.hasPrompt&&void 0===s.value&&s.defaults&&s.defaults.length>0){for(const e of s.defaults){if(!e.condition){s.value=e.value,this.configValues[s.name]=e.value;break}try{if(this.evaluator.evaluate(e.condition)){s.value=e.value,this.configValues[s.name]=e.value;break}}catch(t){T.warn(`Failed to evaluate default condition for ${s.name}: ${e.condition}`)}}this.isSelectorEffectivelyEnabled(s)&&s.select&&s.select.length>0&&this.processSelectStatements(s,!0)}s.children&&s.children.forEach(i)};this.allMenus.forEach(i),T.debugSelect("[INITIAL_SELECT] Initial select processing completed:"),T.debugSelect(`[INITIAL_SELECT]   - Total menus processed: ${e}`),T.debugSelect(`[INITIAL_SELECT]   - Enabled menus with select statements: ${t}`),this.evaluator.updateContext(this.configValues)}updateItemVisibility(e){const t=this.findMenuById(e);if(!t)return;t.type!==h.menu&&!0!==t.isMenuconfig||!t.title||!0===t.hasPrompt||(t.hasPrompt=!0),t.hasPrompt||(t.isImplicitContainer?(t.isVisible=!1,t.isContainerVisible=!0):(t.isVisible=!1,t.isContainerVisible=!1));const i=this.dependencies.get(e);if(i&&i.dependsOn)try{const e=this.evaluator.evaluate(i.dependsOn);t.hasPrompt?(t.isVisible=e,t.isContainerVisible=e):t.isImplicitContainer?(t.isVisible=!1,t.isContainerVisible=e):(t.isVisible=!1,t.isContainerVisible=!1)}catch(e){T.warn(`Failed to evaluate visibility for ${t.name}: ${i.dependsOn}. Error: ${e}`),t.isVisible=!!t.hasPrompt,t.isContainerVisible=!!t.hasPrompt||!!t.isImplicitContainer}else t.hasPrompt&&(t.isVisible=!0,t.isContainerVisible=!0)}updateAllVisibility(){const e=t=>{this.updateItemVisibility(t.id),t.children&&t.children.forEach(e)};this.allMenus.forEach(e)}getDependencyInfo(){return new Map(this.dependencies)}hasDependents(e){const t=this.dependencies.get(e);return!!t&&t.dependents.size>0}getDependents(e){const t=this.dependencies.get(e);return t?Array.from(t.dependents):[]}processSelectStatements(e,t,i){const s=!e.dependsOn||this.safeEval(e.dependsOn),n=t&&s&&!0===e.value&&e.type===h.bool;if(T.debugSelect(`Processing select statements for ${e.name}, enabled: ${t}, depsOk=${s}, effective=${n}`),T.debugSelect(`Menu ${e.name} has ${e.select?.length||0} select targets`),e.select&&0!==e.select.length){T.debugSelect(`Select targets for ${e.name}: ${e.select.join(", ")}`);for(const t of e.select){const s=e.selectConditions?.[t];if(s){const e=this.evaluator.evaluate(s);if(T.debugSelect(`Select ${t} has condition "${s}", evaluated to: ${e}`),!e){T.debugSelect(`Skipping select ${t} as condition is not met`);continue}}const r=this.findMenuByName(t);T.debugSelect(`Processing select target ${t}, found: ${r?"yes":"no"}`),r?(T.debugSelect(`Target menu ${r.name} current selectedBy: ${r.selectedBy?.join(", ")||"none"}`),n?(this.addSelectRelationship(e,r),this.autoSelectTarget(r,e,i)):(this.removeSelectRelationship(e,r),this.checkAutoDeselectTarget(r,e,i)),T.debugSelect(`Target menu ${r.name} updated selectedBy: ${r.selectedBy?.join(", ")||"none"}`)):T.debugSelect(`Select target ${t} not found for ${e.name}`)}}else T.debugSelect(`No select targets for ${e.name}, returning`)}safeEval(e){try{return this.evaluator.evaluate(e)}catch(t){return T.debugSelect(`[SELECT_EVAL] Failed to evaluate expression: ${e}. Error: ${t}`),!1}}addSelectRelationship(e,t){t.selectedBy||(t.selectedBy=[]),t.selectedBy.includes(e.name)||(t.selectedBy.push(e.name),T.debugSelect(`Added ${e.name} as selector for ${t.name}`),this.syncSymbolState(t))}removeSelectRelationship(e,t){if(t.selectedBy){const i=t.selectedBy.indexOf(e.name);i>-1&&(t.selectedBy.splice(i,1),this.syncSymbolState(t))}}autoSelectTarget(e,t,i){if(e.type===h.bool){T.debugSelect(`[SELECT_PROCESSOR] Auto-selecting ${e.name} due to ${t.name}`),void 0===e.autoSelectedValue&&(e.autoSelectedPreviousValue=e.value,e.autoSelectedPreviousWasDefault=e.isDefaultValue);const s=!0!==e.value;e.value=!0,e.autoSelectedValue=!0,e.isDefaultValue=!1,this.configValues[e.name]=!0,this.evaluator.setValue(e.name,!0),s&&i&&this.markMenuAndPeersChanged(e,i),this.syncSymbolState(e),T.debugSelect(`[SELECT_PROCESSOR] ${e.name} set to true and marked as auto-selected`),e.select&&e.select.length>0&&(T.debugSelect(`[SELECT_PROCESSOR] Processing ${e.name}'s select statements recursively`),this.processSelectStatements(e,!0,i))}else T.debugSelect(`[SELECT_PROCESSOR] Skipping auto-select for ${e.name} (not bool type, is ${e.type})`)}checkAutoDeselectTarget(e,t,i){const s=e.selectedBy&&e.selectedBy.some(e=>{if(e===t.name)return!1;const i=this.findMenuByName(e);return i&&!0===i.value});if(!s&&e.autoSelectedValue){const t=e.autoSelectedPreviousValue,s=e.autoSelectedPreviousWasDefault,n=this.getFallbackValueForType(e.type),r=void 0!==t?t:n;T.debugSelect(`[SELECT_PROCESSOR] Restoring ${e.name} to ${JSON.stringify(r)} with fallback ${JSON.stringify(n)}`);const o=!this.areMenuValuesEqual(e.value,r,e.type);if(e.value=r,e.autoSelectedValue=void 0,e.autoSelectedPreviousValue=void 0,e.autoSelectedPreviousWasDefault=void 0,e.isDefaultValue=void 0!==s?s:r===n,this.configValues[e.name]=r,this.evaluator.setValue(e.name,r),o&&i&&this.markMenuAndPeersChanged(e,i),e.select&&e.select.length>0&&e.type===h.bool){const t=!0===r;this.processSelectStatements(e,t,i)}this.syncSymbolState(e)}else!s&&e.value}updateReadonlyStates(e){T.debugVisibility("[READONLY_PROCESSOR] Starting readonly states update...");const t=new Set;let i=0,s=0,n=0;const r=e=>{i++;const r=e.isReadonly,o=e.readonlyReason,a=e.value;if(e.isReadonly=!1,e.readonlyReason=void 0,e.selectedBy&&e.selectedBy.length>0){n++,T.debugVisibility(`[READONLY_PROCESSOR] Processing ${e.name} with selectedBy: [${e.selectedBy.join(", ")}]`);const t=e.selectedBy.filter(t=>{const i=this.findMenuByName(t),s=!!i&&this.isSelectorEffectivelyEnabled(i);return T.debugVisibility(`[READONLY_PROCESSOR] Checking selector ${t} for ${e.name}:`),T.debugVisibility(`[READONLY_PROCESSOR]   - Found selector: ${!!i}`),i&&(T.debugVisibility(`[READONLY_PROCESSOR]   - Selector type: ${i.type}`),T.debugVisibility(`[READONLY_PROCESSOR]   - Selector value: ${i.value} (type: ${typeof i.value})`),T.debugVisibility(`[READONLY_PROCESSOR]   - Selector dependsOn: ${i.dependsOn||"(none)"}`),T.debugVisibility(`[READONLY_PROCESSOR]   - Is active (value && deps): ${s}`)),s});T.debugVisibility(`[READONLY_PROCESSOR] Active selectors for ${e.name}: [${t.join(", ")}]`),t.length>0?(e.isReadonly=!0,s++,1===t.length?e.readonlyReason=`此选项被 ${t[0]} 自动选择`:e.readonlyReason=`此选项被以下配置自动选择: ${t.join(", ")}`,T.debugVisibility(`[READONLY_PROCESSOR] ✓ ${e.name} is now READONLY due to active selectors: ${t.join(", ")}`),"bool"===e.type&&!0!==e.value&&(T.debugVisibility(`[READONLY_PROCESSOR] Auto-selecting ${e.name} due to select relationship`),void 0===e.autoSelectedValue&&(e.autoSelectedPreviousValue=e.value,e.autoSelectedPreviousWasDefault=e.isDefaultValue),e.value=!0,e.autoSelectedValue=!0,e.isDefaultValue=!1,this.configValues[e.name]=!0,this.evaluator.setValue(e.name,!0))):T.debugVisibility(`[READONLY_PROCESSOR] ${e.name} has selectedBy but no active selectors`)}r===e.isReadonly&&o===e.readonlyReason&&this.areMenuValuesEqual(a,e.value,e.type)||(T.debugVisibility(`[READONLY_PROCESSOR] State changed for ${e.name}: ${r} → ${e.isReadonly}`),this.markMenuAndPeersChanged(e,t))};e?e.forEach(e=>{const t=this.findMenuById(e);t&&r(t)}):this.menuById.forEach(e=>{r(e)}),T.debugVisibility("[READONLY_PROCESSOR] Readonly states update completed:"),T.debugVisibility(`[READONLY_PROCESSOR]   - Total menus processed: ${i}`),T.debugVisibility(`[READONLY_PROCESSOR]   - Menus with selectedBy: ${n}`),T.debugVisibility(`[READONLY_PROCESSOR]   - Menus now readonly: ${s}`);const o=this.findMenuByName("DFS_USING_POSIX");o&&(T.debugVisibility("[READONLY_PROCESSOR] DFS_USING_POSIX status:"),T.debugVisibility(`[READONLY_PROCESSOR]   - selectedBy: [${o.selectedBy.join(", ")}]`),T.debugVisibility(`[READONLY_PROCESSOR]   - isReadonly: ${o.isReadonly}`),T.debugVisibility(`[READONLY_PROCESSOR]   - value: ${o.value}`),T.debugVisibility(`[READONLY_PROCESSOR]   - readonlyReason: ${o.readonlyReason}`));const a=this.findMenuByName("RT_USING_HOOKLIST");return a&&(T.debugVisibility("[READONLY_PROCESSOR] RT_USING_HOOKLIST status:"),T.debugVisibility(`[READONLY_PROCESSOR]   - selectedBy: [${a.selectedBy.join(", ")}]`),T.debugVisibility(`[READONLY_PROCESSOR]   - isReadonly: ${a.isReadonly}`),T.debugVisibility(`[READONLY_PROCESSOR]   - value: ${a.value}`),T.debugVisibility(`[READONLY_PROCESSOR]   - readonlyReason: ${a.readonlyReason}`)),t}findSelectorsForItem(e){const t=i=>{i.select&&i.select.includes(e.name)&&(e.selectedBy.includes(i.name)||e.selectedBy.push(i.name)),i.children&&i.children.forEach(t)};this.allMenus.forEach(t)}logVisibilityState(){const e=(t,i=0)=>{if("  ".repeat(i),t.isVisible,t.dependsOn&&t.dependsOn,t.dependsOn)try{this.evaluator.evaluate(t.dependsOn)}catch(e){}t.children&&t.children.length>0&&t.children.forEach(t=>e(t,i+1))};this.allMenus.forEach(t=>e(t))}debugSelectRelationships(){const e=(t,i=0)=>{"  ".repeat(i),t.name&&(t.select&&t.select.length>0&&t.select.join(", "),t.selectedBy&&t.selectedBy.length>0&&t.selectedBy.join(", "),t.isReadonly,t.readonlyReason),t.children&&t.children.forEach(t=>e(t,i+1))};this.allMenus.forEach(t=>e(t))}isSelectorEffectivelyEnabled(e){if(!e||e.type!==h.bool)return!1;if(!0!==e.value)return!1;try{return!e.dependsOn||""===e.dependsOn.trim()||!!this.evaluator.evaluate(e.dependsOn)}catch(t){return T.debugSelect(`[SELECT_EVAL] Failed to evaluate dependsOn for ${e.name}: ${e.dependsOn}. Error: ${t}`),!1}}}class os{static DEFAULT_CONCURRENCY_LIMIT=100;static MAX_RETRIES=3;static OPTIMAL_BATCH_SIZE=200;concurrencyLimit;fileContentCache=new Map;constructor(e=os.DEFAULT_CONCURRENCY_LIMIT){this.concurrencyLimit=e,T.info(`[CONCURRENT_PROCESSOR] Initialized with concurrency limit: ${e}`)}async readFilesAsync(e){const t=Date.now(),i=new Map,s=this.chunkArray(e,this.concurrencyLimit);for(let e=0;e<s.length;e++){const t=s[e],n=t.map(e=>this.readSingleFileWithRetry(e));(await Promise.allSettled(n)).forEach((e,s)=>{const n=t[s];"fulfilled"===e.status&&null!==e.value?i.set(n,e.value):"rejected"===e.status&&(T.warn(`[CONCURRENT_PROCESSOR] 无法读取文件: ${n}`),T.error(`[CONCURRENT_PROCESSOR] 读取错误: ${e.reason}`))})}const n=Date.now()-t,r=i.size;return r>0&&(n/r).toFixed(1),i}async processGlobPattern(e){Date.now();try{const t=(await es(e,{nodir:!0})).sort();return Date.now(),0===t.length?(T.warn(`[CONCURRENT_PROCESSOR] Glob 模式未匹配到任何文件: ${e}`),new Map):await this.readFilesAsync(t)}catch(t){return T.error(`[CONCURRENT_PROCESSOR] Glob 解析失败: ${e}`,t),new Map}}async readSingleFileWithRetry(e,t=0){if(this.fileContentCache.has(e))return this.fileContentCache.get(e);try{const t=await c.promises.readFile(e,"utf8");return this.fileContentCache.set(e,t),t}catch(i){return"ENOENT"===i.code?null:t<os.MAX_RETRIES?(T.warn(`[CONCURRENT_PROCESSOR] 重试读取文件 ${e} (第 ${t+1} 次)`),await this.sleep(100*(t+1)),this.readSingleFileWithRetry(e,t+1)):(T.error(`[CONCURRENT_PROCESSOR] 读取文件失败，已达最大重试次数: ${e}`,i),null)}}chunkArray(e,t){const i=[];for(let s=0;s<e.length;s+=t)i.push(e.slice(s,s+t));return i}estimateSpeedImprovement(e,t){const i=50*e;return Math.round(i/t*10)/10}sleep(e){return new Promise(t=>setTimeout(t,e))}clearCache(){this.fileContentCache.clear(),T.info("[CONCURRENT_PROCESSOR] 缓存已清理")}getCacheStats(){const e=Array.from(this.fileContentCache.values()).reduce((e,t)=>e+t.length,0);return{cachedFiles:this.fileContentCache.size,cacheSize:`${(e/1024/1024).toFixed(2)} MB`}}}class as{static SOURCE_PREFETCH_BATCH_SIZE=16;static SOURCE_PREFETCH_MAX_DEPTH=2;workspaceFolder;mainKconfigFile;currentId=0;visibilityManager;exprParser;variables=new Map;srctreeRoot;fileContentCache=new Map;expandedVariableCache=new Map;allParsedFiles=new Set;dependencyExprCache=new Map;scheduledPrefetchFiles=new Set;prefetchTasks=new Set;sourcePrefetchQueue=[];sourcePrefetchWorkerRunning=!1;allowBackgroundPrefetch=!1;concurrentProcessor;fileOpenCounter=0;openedFilesList=[];activeParsingFiles=new Set;static async create(e){return new as(e)}constructor(e){this.workspaceFolder=e.workspaceFolder,this.mainKconfigFile=e.mainKconfigFile,this.visibilityManager=new rs,this.exprParser=new ss,this.concurrentProcessor=new os(32);const t=process.env.srctree||process.env.SRCTREE;this.srctreeRoot=t?a.isAbsolute(t)?t:a.resolve(this.workspaceFolder,t):a.dirname(this.mainKconfigFile)}getVisibilityManager(){return this.visibilityManager}getParsedFiles(){return Array.from(this.allParsedFiles)}async parse(){T.info(()=>`Starting Kconfig parsing from: ${this.mainKconfigFile}`);const e=Date.now(),t=a.normalize(this.mainKconfigFile);this.activeParsingFiles.clear(),this.activeParsingFiles.add(t),this.allParsedFiles.clear(),this.allParsedFiles.add(t),this.dependencyExprCache.clear(),this.scheduledPrefetchFiles.clear(),this.prefetchTasks.clear(),this.sourcePrefetchQueue=[],this.sourcePrefetchWorkerRunning=!1,this.allowBackgroundPrefetch=!0;try{const t=await this.buildNodeTree(this.mainKconfigFile);T.debugParser("After buildNodeTree - structure built"),this.buildSelectRelationshipsInTree(t),T.debugParser("After buildSelectRelationshipsInTree - relationships built"),this.flatten(t),T.debugParser("After flatten - structure flattened"),this.removeIfs(t),T.debugParser("After removeIfs - conditional nodes processed"),this.propagateMenuConditions(t),T.debugParser("After propagateMenuConditions - menu conditions propagated"),this.createImplicitMenus(t),T.debugParser("After createImplicitMenus - implicit menus created");const i=this.convertToMenuArray(t);this.buildSelectRelationships(i);const s=Date.now();return T.info(()=>`Parsing completed in ${s-e}ms`),T.info(()=>`Total menus parsed: ${i.length}`),i}catch(e){throw T.error(`Error parsing Kconfig: ${e}`),e}finally{this.allowBackgroundPrefetch=!1,this.sourcePrefetchQueue=[],this.activeParsingFiles.clear()}}async buildNodeTree(e){const t=new ts;t.is_menuconfig=!0,t.node_type="menuconfig";const i=await this.readFile(e);return await this.parseLines(i,t,e),t}async parseLines(e,t,i,s=0,n=null){let r=s;for(;r<e.length;){const s=e[r].trim();if(!s||s.startsWith("#")){r++;continue}if(n&&(s===n||s.startsWith(n+" ")||s.startsWith(n+"\t")))return T.debugParser(`Found endToken '${n}' at line ${r} (current file: ${i}), returning ${r+1}`),r+1;const o=s.match(/^([A-Za-z0-9_]+)\s*(?::=|\+=|=)\s*(.*)$/);if(o){const[,e,t]=o,i=s.includes(":=")?":=":s.includes("+=")?"+=":"=";let n=t.trim();if("+="===i){const t=this.variables.get(e),i=t&&t.value&&!t.value.endsWith(" ")?" ":"",s=t?`${t.value}${i}${n}`:n;this.variables.set(e,{value:s,isRecursive:!t||t.isRecursive}),T.debugParser(`Append variable: ${e} += ${n} -> ${s}`)}else":="===i&&(n=this.expandKconfigString(n)),this.variables.set(e,{value:n,isRecursive:"="===i}),T.debugParser(`Set variable: ${e} ${i} ${n}`);r++;continue}if("menu"===t.node_type){if(s.startsWith("visible if ")){const e=s.substring(11).trim();t.visibility?t.visibility=this.andExpr(t.visibility,e):t.visibility=e,r++;continue}if(s.startsWith("depends on ")){const e=s.substring(11).trim();if(t.dep?t.dep=this.andExpr(t.dep,e):t.dep=e,t.item){const e=this.andExpr(t.dep,t.visibility||void 0)||t.dep||"";t.item.dependsOn=e}r++;continue}}if(s.startsWith("mainmenu ")){const e=this.extractQuotedString(s.substring(9));T.debugParser(`Found mainmenu: "${e}"`),t.prompt||(t.prompt=[e,"y"],t.item=this.createMenu({name:"",title:e,type:h.menu,isMenuconfig:!1,isVisible:!0,hasPrompt:!0,isMainMenu:!0}),T.debugParser(`Created mainmenu item: title="${e}", type=menu, isMenuconfig=false, isVisible=true`)),r++;continue}if(s.startsWith("if ")){const n=s.substring(3).trim(),o=new ts;o.node_type="if",o.item=null,o.prompt=null,o.dep=n,o.parent=t,o.filename=i,o.linenr=r+1,t.addChild(o),r=await this.parseLines(e,o,i,r+1,"endif");continue}if(s.startsWith("menu ")){const n=this.extractQuotedString(s.substring(5)),o=new ts;o.node_type="menu",o.is_menuconfig=!1,o.prompt=[n,"y"],o.filename=i,o.linenr=r+1,o.item=this.createMenu({name:"",title:n,type:h.menu,isMenuconfig:!1,isVisible:!0,hasPrompt:!0}),t.addChild(o),r=await this.parseLines(e,o,i,r+1,"endmenu");continue}if(s.startsWith("comment ")){const s=await this.parseComment(e,r,i);s?(t.addChild(s),r=s.nextIndex||r+1):r++;continue}if(s.startsWith("choice")){const n="choice"===s.trim()?null:s.substring(6).trim(),o=await this.parseChoice(e,r,i,n);o?(t.addChild(o),r=o.nextIndex||r+1):r++;continue}if(s.startsWith("config ")||s.startsWith("menuconfig ")){const s=await this.parseConfig(e,r,i);s?(t.addChild(s),r=s.nextIndex||r+1):r++;continue}if(s.startsWith("source ")||s.startsWith("rsource ")||s.startsWith("osource ")||s.startsWith("orsource ")){const e=await this.parseSource(s,i);if(e){const i=this.deduplicateSourceFiles(e.files);await this.preloadSourceFiles(i,s);for(const n of i){const i=a.normalize(n);if(this.activeParsingFiles.has(i)){T.warn(`Detected recursive source include, skipping: ${i}`);continue}this.fileOpenCounter++,this.openedFilesList.push({index:this.fileOpenCounter,file:i,directive:s,time:new Date}),this.allParsedFiles.add(i);const r=await this.readFile(i);if(0!==r.length){this.activeParsingFiles.add(i);try{await this.parseLines(r,t,i)}finally{this.activeParsingFiles.delete(i)}}else e.optional||T.warn(`Source file not found or empty: ${i}`)}}else T.warn(`Source directive failed: ${s}`);r++;continue}r++}return r}async parseConfig(e,t,i){const s=e[t].trim(),n=s.startsWith("menuconfig "),r=s.match(/^(?:menu)?config\s+([A-Z0-9_]+)/);if(!r)return null;const o=r[1],a=new ts;a.node_type=n?"menuconfig":"config",a.is_menuconfig=n,a.filename=i,a.linenr=t+1;const l=this.createMenu({name:o,title:"",type:h.bool,isMenuconfig:n,linenr:t+1});a.item=l;let c=t+1,u=!1;for(;c<e.length;){const t=e[c].trim();if(!t||t.startsWith("#")){c++;continue}if(t.match(/^(config|menuconfig|menu|if|comment)\s/)||"choice"===t||t.startsWith("choice ")||t.startsWith("source ")||t.startsWith("rsource ")||t.startsWith("osource ")||t.startsWith("orsource ")){T.debugParser(`[CONFIG_PARSER] Breaking at top-level directive within config ${o}: '${t}'`);break}if("endif"===t||"endmenu"===t||"endchoice"===t||t.startsWith("endif ")||t.startsWith("endmenu ")||t.startsWith("endchoice "))break;const i=t.match(/^(bool|tristate|string|int|hex)(?:\s+(.*))?$/);if(i){const[,e,t]=i;if(l.type=e,t){const e=t.match(/"([^"]+)"/);if(e){l.title=e[1];const i=t.indexOf('"'),s=t.indexOf('"',i+1);let n="y";if(-1!==s){const e=t.substring(s+1).trim();e.startsWith("if ")&&(n=e.substring(3).trim())}a.prompt=[e[1],n],u=!0}}c++;continue}if(t.startsWith("depends on ")){const e=t.substring(11).trim();a.explicit_dep?a.explicit_dep=`(${a.explicit_dep}) && (${e})`:a.explicit_dep=e,a.dep?a.dep=`(${a.dep}) && (${e})`:a.dep=e,l.dependsOn=a.dep}const s=t.match(/^def_bool\s+(.+)$/);if(s){const e=s[1].trim(),t=e.indexOf(" if ");let i,n;t>-1?(i=e.substring(0,t).trim(),n=e.substring(t+4).trim(),T.debugParser(`[DEFAULT_PARSER] ${o} -> def_bool "${i}" if ${n}`)):(i=e.trim(),T.debugParser(`[DEFAULT_PARSER] ${o} -> def_bool "${i}"`)),i=this.expandDefaultValue(i),l.type=h.bool,l.defaults||(l.defaults=[]),l.defaults.push({value:i,condition:n}),c++;continue}if(t.startsWith("default ")){const e=t.substring(8).trim(),i=e.indexOf(" if ");let s,n;i>-1?(s=e.substring(0,i).trim(),n=e.substring(i+4).trim(),T.debugParser(`[DEFAULT_PARSER] ${o} -> default "${s}" if ${n}`)):(s=e.trim(),T.debugParser(`[DEFAULT_PARSER] ${o} -> default "${s}"`)),s=this.expandDefaultValue(s),l.defaults||(l.defaults=[]),l.defaults.push({value:s,condition:n})}if(t.startsWith("option ")){const e=t.substring(7).trim();if(e.startsWith("env")){const t=e.match(/env\s*=\s*"?([A-Za-z0-9_]+)"?/);t&&(l.optionEnvVar=t[1],T.debugParser(`[OPTION_PARSER] ${o} -> option env="${l.optionEnvVar}"`))}else"defconfig_list"===e?(l.optionDefconfigList=!0,T.debugParser(`[OPTION_PARSER] ${o} marked as defconfig_list`)):"modules"===e&&(l.optionModules=!0,T.debugParser(`[OPTION_PARSER] ${o} marked as modules symbol`));c++;continue}if(t.startsWith("select ")){const e=t.substring(7).trim();let i,s=e;const n=e.indexOf(" if ");n>-1&&(s=e.substring(0,n).trim(),i=e.substring(n+4).trim()),l.select||(l.select=[]),l.select.push(s),i&&(l.selectConditions||(l.selectConditions={}),l.selectConditions[s]=i),a.item||T.error(`[SELECT_PARSE] ERROR: node.item is null for ${o}`)}if(t.startsWith("imply ")){const e=t.substring(6).trim();let i,s=e;const n=e.indexOf(" if ");n>-1&&(s=e.substring(0,n).trim(),i=e.substring(n+4).trim()),l.implies||(l.implies=[]),l.implies.push(s),i&&(l.implyConditions||(l.implyConditions={}),l.implyConditions[s]=i),T.debugParser(`[IMPLY_PARSER] ${o} implies ${s}${i?` if ${i}`:""}`),c++;continue}if(t.startsWith("range ")){const e=t.match(/range\s+(\d+)\s+(\d+)/);e&&(l.range=[parseInt(e[1]),parseInt(e[2])])}if(t.startsWith("help")||t.startsWith("---help---")){const t=[];c++;let i=-1;for(;c<e.length;){const s=e[c];if(s.trim()){i=s.length-s.trimStart().length,t.push(s),c++;break}c++}if(i>=0)for(;c<e.length;){const s=e[c];if(s.trim()){if(s.length-s.trimStart().length<i)break;t.push(s),c++}else t.push(s),c++}l.help=x(t.join("\n").trim());continue}c++}return l.hasPrompt=u,a.dep&&!l.dependsOn&&(l.dependsOn=a.dep),l.isVisible=!!n||u,a.nextIndex=c,a}async parseComment(e,t,i){const s=e[t].trim();if(!s.startsWith("comment "))return null;const n=this.extractQuotedString(s.substring(8)),r=new ts;r.node_type="comment",r.is_menuconfig=!1,r.filename=i,r.linenr=t+1;const o=this.createMenu({name:"",title:n,prompt:n,type:h.comment,isMenuconfig:!1,hasPrompt:!0,isVisible:!0,linenr:t+1});r.item=o;const a=s.indexOf('"'),l=s.indexOf('"',a+1);let c="y";if(-1!==l){const e=s.substring(l+1).trim();e.startsWith("if ")&&(c=e.substring(3).trim())}r.prompt=[n,c],"y"!==c&&(r.dep=c,o.dependsOn=c);let u=t+1;for(;u<e.length;){const t=e[u].trim();if(t&&!t.startsWith("#")){if(t.match(/^(config|menuconfig|menu|if|comment)\s/)||"choice"===t||t.startsWith("choice ")||t.startsWith("source ")||t.startsWith("rsource ")||t.startsWith("osource ")||t.startsWith("orsource "))break;if("endif"===t||"endmenu"===t||"endchoice"===t||t.startsWith("endif ")||t.startsWith("endmenu ")||t.startsWith("endchoice "))break;if(t.startsWith("depends on ")){const e=t.substring(11).trim();r.dep=this.andExpr(r.dep,e)??e,o.dependsOn=r.dep||"",u++;continue}u++}else u++}return r.nextIndex=u,r}async parseChoice(e,t,i,s){const n=new ts;n.node_type="choice",n.is_menuconfig=!0,n.filename=i,n.linenr=t+1;const r=this.createMenu({name:s||"choice_"+this.currentId++,title:"Choice",type:h.choice,isMenuconfig:!0});n.item=r;let o=t+1,a=!1;for(;o<e.length;){const t=e[o].trim();if("endchoice"===t){n.nextIndex=o+1;break}if(t&&!t.startsWith("#")){if(t.startsWith("prompt ")){const e=t.match(/prompt\s+"([^"]+)"/);if(e){r.title=e[1];const i=t.indexOf('"'),s=t.indexOf('"',i+1);let o="y";if(-1!==s){const e=t.substring(s+1).trim();e.startsWith("if ")&&(o=e.substring(3).trim())}n.prompt=[e[1],o],a=!0}o++;continue}if(t.startsWith("depends on ")){const e=t.substring(11).trim();n.dep=this.andExpr(n.dep,e)??e,r.dependsOn=n.dep||"",o++;continue}if(t.startsWith("default ")){const e=t.substring(8).trim(),i=e.indexOf(" if ");let s,n;i>-1?(s=e.substring(0,i).trim(),n=e.substring(i+4).trim()):s=e.trim(),r.defaults||(r.defaults=[]),r.defaults.push({value:s,condition:n}),o++;continue}if(t.startsWith("config ")){const t=await this.parseConfig(e,o,i);t?(n.addChild(t),o=t.nextIndex||o+1):o++;continue}if(t.startsWith("comment ")){const t=await this.parseComment(e,o,i);t?(n.addChild(t),o=t.nextIndex||o+1):o++;continue}o++}else o++}return n.dep&&(r.dependsOn=n.dep),r.hasPrompt=a,r.isVisible=!0,n}flatten(e){const t=[];let i=e.list;for(;i;)i.list&&this.flatten(i),i.shouldFlatten()&&t.push(i),i=i.next;for(const e of t)this.flattenNode(e)}flattenNode(e){if(!e.list||!e.parent)return;const t=e.parent,i=e.list;let s=i,n=i;for(;s;)s.parent=t,e.dep&&(e.isIfNode()?(s.if_dep?s.if_dep.includes("||")||e.dep.includes("||")?s.if_dep=`(${s.if_dep}) && (${e.dep})`:s.if_dep=`${s.if_dep} && ${e.dep}`:s.if_dep=e.dep,s.dep?s.dep.includes("||")||e.dep.includes("||")?s.dep=`(${s.dep}) && (${e.dep})`:s.dep=`${s.dep} && ${e.dep}`:s.dep=e.dep):(T.debugParser(`[FLATTEN_NON_IF] Flattening non-if node, merging dep: ${e.dep}`),s.dep?s.dep.includes("||")||e.dep.includes("||")?s.dep=`(${s.dep}) && (${e.dep})`:s.dep=`${s.dep} && ${e.dep}`:s.dep=e.dep),s.item&&(s.item.dependsOn=s.dep,T.debugParser(`[FLATTEN] Updated menu "${s.item.title||s.item.name}" dependsOn to: ${s.dep}`))),n=s,s=s.next;if(t.list===e)t.list=i;else{let s=t.list;for(;s&&s.next!==e;)s=s.next;s&&(s.next=i)}n.next=e.next,e.list=null,e.next=null}removeIfs(e){let t=e.list;for(;t;)t.list&&this.removeIfs(t),t=t.next;let i=null;for(t=e.list;t;){const s=t.next;t.isIfNode()?i?i.next=s:e.list=s:i=t,t=s}}propagateMenuConditions(e){const t=(e,i)=>{const s=this.andExpr(i||void 0,"menu"===e.node_type&&e.visibility||void 0);let n=e.list;for(;n;){"menu"===e.node_type&&e.dep&&(n.dep=this.andExpr(n.dep||void 0,e.dep)||n.dep||e.dep);const i=n.prompt&&n.prompt[1]||"y",r="menu"===n.node_type&&n.visibility||void 0,o=s||void 0;let a=this.andExpr(i,o);a=this.andExpr(a||void 0,r),a=this.andExpr(a||void 0,n.dep||void 0),n.item&&n.prompt&&(n.prompt=[n.prompt[0],a||"y"]),n.item&&(a?n.item.dependsOn=a:n.item.dependsOn||(n.item.dependsOn=""));const l=a||s||null;n.list&&t(n,l),n=n.next}};t(e,null)}andExpr(e,t){const i=e=>e&&e.trim().length>0?e.trim():null,s=i(e),n=i(t);if(!s)return n;if(!n)return s;const r=e=>e.includes("||")?`(${e})`:e;return`${r(s)} && ${r(n)}`}createImplicitMenus(e){T.debugParser(`[IMPLICIT_MENU] Processing node: ${e.toString()}`);let t=e.list;for(;t;){if(t.item&&t.item.name){let e=t;const i=new Set;for(t.item&&t.item.name&&i.add(t.item.name);e.next;){const t=e.next;let s=null;if(t.prompt){const e=t.prompt[1];e&&"y"!==e&&(s=e)}s||(s=t.dep||t.explicit_dep||null);let n=!1;if(s&&i.size>0)try{const e=s.trim();let t=this.dependencyExprCache.get(e);t||(t=this.exprParser.parse(e),this.dependencyExprCache.set(e,t));for(const e of i)if(this.exprParser.exprDependsOn(t,e)){n=!0;break}}catch(e){T.warn(`[IMPLICIT_MENU] Failed to parse dependency expression "${s}": ${e}`)}if(!n)break;t.item&&t.item.name&&i.add(t.item.name),e=t}if(e!==t){const i=t.next,s=e,n=e.next;let r=i;for(;r&&(r.parent=t,r!==s);)r=r.next;t.next=n,t.list=i,s.next=null}}t.list&&this.createImplicitMenus(t),t=t.next}}convertToMenuArray(e){const t=[];if(e.item,e.item&&e.prompt){const i=e.item;i.indentLevel=0,i.children=[],i.isCollapsed=!1;let s=e.list,n=0;for(;s;)s.item&&(("menu"===s.item.type||s.item.isMenuconfig)&&(s.item.isCollapsed=s.item.isCollapsed??!0),this.convertChildNode(s,i.children),n++),s=s.next;t.push(i),i.children.length}else this.convertNode(e,t,!0);return t.length>0&&t[0].children,t}convertNode(e,t,i=!1){if(!i&&e.item)this.convertChildNode(e,t);else if(i){let i=e.list;for(;i;)this.convertNode(i,t,!1),i=i.next}}convertChildNode(e,t){if(e.item){const i=e.item;if(i.indentLevel=e.calculateIndent(),e.list?i.shouldIndentChildren=!0:i.shouldIndentChildren=!1,i.isMenuconfig&&(i.isCollapsed=i.isCollapsed??!1),t.push(i),e.list){i.children=[];let t=e.list;for(;t;)t.item&&this.convertChildNode(t,i.children),t=t.next}}}createMenu(e){return{id:"menu-"+this.currentId++,name:e.name||"",title:e.title||"",type:e.type||h.bool,value:e.value??null,help:e.help||"",range:e.range||[],isVisible:e.isVisible??!0,isCollapsed:e.isCollapsed??!1,isMenuconfig:e.isMenuconfig??!1,hasPrompt:e.hasPrompt??!1,dependsOn:e.dependsOn||"",select:e.select||[],selectedBy:e.selectedBy||[],children:e.children||[],indentLevel:e.indentLevel??0,isMainMenu:e.isMainMenu??!1,optionEnvVar:e.optionEnvVar??null,optionDefconfigList:e.optionDefconfigList??!1,optionModules:e.optionModules??!1,implies:e.implies?[...e.implies]:[],implyConditions:e.implyConditions?{...e.implyConditions}:void 0,autoImpliedValue:e.autoImpliedValue,allowedTristateValues:e.allowedTristateValues?[...e.allowedTristateValues]:void 0,linenr:e.linenr,menuPath:e.menuPath,directDepValue:e.directDepValue,directDepExpr:e.directDepExpr,prompt:e.prompt||e.title||"",selectInfo:e.selectInfo,selectedByInfo:e.selectedByInfo,implyInfo:e.implyInfo}}async readFile(e){if(this.fileContentCache.has(e))return this.fileContentCache.get(e);try{const t=(await c.promises.readFile(e,"utf-8")).split("\n");return this.fileContentCache.set(e,t),this.scheduleSourcePrefetch(t,e,0),t}catch(t){return t&&"ENOENT"===t.code||T.warn(`Failed to read file ${e}: ${t}`),[]}}async parseSource(e,t,i){const s=e.match(/^(source|rsource|osource|orsource)\s+"?([^"]+)"?/);if(!s)return null;const n=s[1];let r=s[2];const o=n.startsWith("o"),l="rsource"===n||"orsource"===n,h=this.srctreeRoot;r=this.expandVariables(r);const c=a.isAbsolute(r)?"":l?a.dirname(t):h,u=a.join(c,r);if(!Wi(r)){const e=a.normalize(u);return{files:this.deduplicateSourceFiles([e]),optional:o}}try{const e=this.deduplicateSourceFiles((await es(u,{nodir:!0})).map(e=>a.normalize(e)).sort((e,t)=>e.localeCompare(t)));return 0!==e.length||o||i?.suppressWarnings?{files:e,optional:o}:(T.warn(`Source directive matched zero files: ${u}`),null)}catch(e){return o||i?.suppressWarnings||T.warn(`Failed to glob ${u}: ${e}`),null}}collectSourceDirectives(e){if(!e||0===e.length)return[];const t=[];for(const i of e){const e=i.trim();e&&(e.startsWith("source ")||e.startsWith("rsource ")||e.startsWith("osource ")||e.startsWith("orsource "))&&!e.includes("$(")&&t.push(e)}return t}scheduleSourcePrefetch(e,t,i){if(!this.allowBackgroundPrefetch)return;if(!e||0===e.length||i>=as.SOURCE_PREFETCH_MAX_DEPTH)return;const s=this.collectSourceDirectives(e);if(0===s.length)return;const n=(async()=>{const e=i+1;for(const i of s){const s=await this.parseSource(i,t,{suppressWarnings:!0});if(s&&s.files&&0!==s.files.length)for(const t of s.files){const i=a.normalize(t);this.fileContentCache.has(i)||this.scheduledPrefetchFiles.has(i)||(this.scheduledPrefetchFiles.add(i),this.sourcePrefetchQueue.push({filePath:i,depth:e}))}}this.ensureSourcePrefetchWorker()})().catch(e=>{T.debugSource(()=>`[SOURCE_PREFETCH] Failed to schedule prefetch for ${t}: ${e}`)});this.prefetchTasks.add(n),n.finally(()=>{this.prefetchTasks.delete(n)}).catch(()=>{})}ensureSourcePrefetchWorker(){if(this.sourcePrefetchWorkerRunning||!this.allowBackgroundPrefetch)return;const e=(async()=>{this.sourcePrefetchWorkerRunning=!0;try{for(;this.allowBackgroundPrefetch&&this.sourcePrefetchQueue.length>0;){const e=this.sourcePrefetchQueue.splice(0,as.SOURCE_PREFETCH_BATCH_SIZE),t=e.map(e=>e.filePath),i=new Map;for(const t of e){const e=i.get(t.filePath);(void 0===e||t.depth<e)&&i.set(t.filePath,t.depth)}const s=await this.concurrentProcessor.readFilesAsync(t);if(!this.allowBackgroundPrefetch)break;for(const[e,t]of s.entries()){if(this.fileContentCache.has(e))continue;const s=t.split("\n");this.fileContentCache.set(e,s);const n=i.get(e)??as.SOURCE_PREFETCH_MAX_DEPTH;n<as.SOURCE_PREFETCH_MAX_DEPTH&&this.scheduleSourcePrefetch(s,e,n)}}}finally{this.sourcePrefetchWorkerRunning=!1,this.allowBackgroundPrefetch&&this.sourcePrefetchQueue.length>0&&this.ensureSourcePrefetchWorker()}})();this.prefetchTasks.add(e),e.finally(()=>{this.prefetchTasks.delete(e)}).catch(()=>{})}deduplicateSourceFiles(e){if(!e||e.length<=1)return e;const t=new Set,i=[];for(const s of e){const e=a.normalize(s);t.has(e)||(t.add(e),i.push(e))}return i}async preloadSourceFiles(e,t){if(!e||e.length<=1)return;const i=e.filter(e=>!this.fileContentCache.has(e));if(!(i.length<=1))try{const e=await this.concurrentProcessor.readFilesAsync(i);e.forEach((e,t)=>{if(!this.fileContentCache.has(t)){const i=e.split("\n");this.fileContentCache.set(t,i),this.scheduleSourcePrefetch(i,t,1)}}),T.debugParser(`[SOURCE_PRELOAD] Preloaded ${e.size}/${i.length} files for directive: ${t}`)}catch(e){T.warn(`Failed to preload source files for directive "${t}": ${e}`)}}extractQuotedString(e){const t=e.match(/"([^"]+)"/);return t?t[1]:e.trim()}parseDefaultValue(e,t){switch(e=e.replace(/"/g,"").trim(),t){case h.bool:{const t=e.toLowerCase();return"y"===t||"true"===t||"1"===t}case h.tristate:{const t=e.toLowerCase();return"y"===t||"m"===t||"n"===t?t:"true"===t?"y":"false"===t?"n":"2"===t?"y":"1"===t?"m":"0"===t?"n":t||"n"}case h.int:return parseInt(e)||0;case h.hex:case h.string:default:return e}}expandVariables(e){return this.expandKconfigString(e)}expandDefaultValue(e){if(!e)return e;if(e.startsWith('"')&&e.endsWith('"')||e.startsWith("'")&&e.endsWith("'")){const t=e.substring(1,e.length-1),i=this.expandKconfigString(t);return`${e[0]}${i}${e[e.length-1]}`}return this.expandKconfigString(e)}expandKconfigString(e,t=new Set){return e?e.replace(/\$\(([^)]+)\)|\$([A-Za-z_][A-Za-z0-9_]*)/g,(e,i,s)=>{const n=(i||s||"").trim();if(!n)return"";if(t.has(n))return T.warn(`Detected recursive variable expansion for ${n}`),"";t.add(n);let r=this.resolveVariable(n,t);return t.delete(n),void 0===r&&(r=""),r}):e}resolveVariable(e,t){if("PKGS_DIR"===e){const e=(process.env.PKGS_DIR||"").trim();if(e)return e}const i=this.variables.get(e);if(i)return i.isRecursive?this.expandKconfigString(i.value,t):i.value;if("srctree"===e||"SRCTREE"===e)return this.srctreeRoot;const s=process.env[e];return void 0!==s?s:(T.debugParser(`Variable ${e} not found during expansion, defaulting to empty string`),"")}buildSelectRelationshipsInTree(e){T.debugParser("[SELECT_RELATIONSHIPS] Building select relationships in tree...");const t=new Map,i=e=>{e.item&&e.item.name&&(t.set(e.item.name,e),T.debugParser(`[SELECT_RELATIONSHIPS] Collected node: ${e.item.name}`));let s=e.list;for(;s;)i(s),s=s.next};i(e),T.debugParser(`[SELECT_RELATIONSHIPS] Collected ${t.size} nodes with names`);const s=e=>{if(e.item&&e.item.select){T.debugParser(`[SELECT_RELATIONSHIPS] Processing select statements for ${e.item.name}: [${e.item.select.join(", ")}]`);for(const i of e.item.select){const s=t.get(i);s&&s.item?(T.debugParser(`[SELECT_RELATIONSHIPS] Found target node ${i}, marking as selected by ${e.item.name}`),s.item.selectedBy||(s.item.selectedBy=[]),s.item.selectedBy.includes(e.item.name)||(s.item.selectedBy.push(e.item.name),T.debugParser(`[SELECT_RELATIONSHIPS] Added selectedBy relationship: ${i} is selected by ${e.item.name}`)),!s.prompt&&s.item.selectedBy.length>0&&(s.item.isImplicitContainer=!0,T.debugParser(`[SELECT_RELATIONSHIPS] Marked ${i} as implicit container (no prompt but selected)`))):T.debugParser(`[SELECT_RELATIONSHIPS] WARNING: Select target ${i} not found in node map for selector ${e.item.name}`)}}let i=e.list;for(;i;)s(i),i=i.next};s(e),T.debugParser("[SELECT_RELATIONSHIPS] Final select relationships:");for(const[e,i]of t)i.item&&i.item.selectedBy&&i.item.selectedBy.length>0&&T.debugParser(`[SELECT_RELATIONSHIPS]   ${e} is selected by: [${i.item.selectedBy.join(", ")}]`);T.debugParser("[SELECT_RELATIONSHIPS] Select relationships building completed")}buildSelectRelationships(e){const t=this.flattenMenus(e),i=new Map;for(const e of t)e.name&&(i.set(e.name,e),T.debugParser(`[MENU_SELECT_RELATIONSHIPS] Mapped menu: ${e.name} (has select: ${e.select.length>0})`));let s=0;for(const e of t)if(e.select.length>0){T.debugParser(`[MENU_SELECT_RELATIONSHIPS] Processing ${e.name} select targets: [${e.select.join(", ")}]`);for(const t of e.select){const n=i.get(t);n?n.selectedBy.includes(e.name)||(n.selectedBy.push(e.name),s++,T.debugParser(`[MENU_SELECT_RELATIONSHIPS] Added relation: ${t} selected by ${e.name}`)):(T.warn(`[MENU_SELECT_RELATIONSHIPS] WARNING: Select target ${t} not found for selector ${e.name}`),"DFS_USING_POSIX"===t&&T.error("[MENU_SELECT_RELATIONSHIPS] *** ERROR: DFS_USING_POSIX not found in menu map! ***"))}}T.debugParser(`[MENU_SELECT_RELATIONSHIPS] Built ${s} select relationships`)}flattenMenus(e){const t=[];for(const i of e)t.push(i),i.children&&i.children.length>0&&t.push(...this.flattenMenus(i.children));return t}}const ls=require("crypto");class hs{static CACHE_VERSION=3;static CACHE_KEY_VERSION="v3";static MAX_STAT_CONCURRENCY=64;static HOT_CACHE_TTL_MS=1e4;static HOT_CACHE_MAX_ENTRIES=4;static HOT_CACHE_SAMPLE_SIZE=12;static hotCache=new Map;cacheDir;constructor(e){this.cacheDir=a.join(e,".kconfig-cache")}static buildCacheKey(e){return ls.createHash("sha1").update(`${a.normalize(e)}|${hs.CACHE_KEY_VERSION}`).digest("hex")}async load(e){const t=await this.tryLoadFromHotCache(e);if(t)return t;const i=this.getCacheFilePath(e);try{const t=await c.promises.readFile(i,"utf8"),s=JSON.parse(t);return s&&s.version===hs.CACHE_VERSION&&s.cacheKey===e&&Array.isArray(s.files)&&Array.isArray(s.menus)?await this.validateFileSignatures(s.files)?(this.updateHotCache(e,s.files,s.menus),this.cloneMenus(s.menus)):(hs.hotCache.delete(e),null):null}catch(t){const i=t;return i&&"ENOENT"===i.code?(hs.hotCache.delete(e),null):(T.debug(()=>`[SESSION_CACHE] Load failed: ${i?.message||String(t)}`),null)}}async save(e,t,i){if(!Array.isArray(t)||0===t.length||!Array.isArray(i)||0===i.length)return;const s=Array.from(new Set(i.map(e=>a.normalize(e)))).sort((e,t)=>e.localeCompare(t)),n=await this.collectFileSignatures(s);if(0===n.length)return;const r={version:hs.CACHE_VERSION,cacheKey:e,createdAt:Date.now(),files:n,menus:t},o=this.getCacheFilePath(e),l=`${o}.tmp`;try{await c.promises.mkdir(this.cacheDir,{recursive:!0}),await c.promises.writeFile(l,JSON.stringify(r),"utf8"),await c.promises.rename(l,o),this.updateHotCache(e,n,t)}catch(e){T.debug(()=>`[SESSION_CACHE] Save failed: ${e instanceof Error?e.message:String(e)}`);try{await c.promises.unlink(l)}catch{}}}getCacheFilePath(e){return a.join(this.cacheDir,`${e}.json`)}async tryLoadFromHotCache(e){const t=hs.hotCache.get(e);return t?Date.now()-t.loadedAt>hs.HOT_CACHE_TTL_MS?(hs.hotCache.delete(e),null):await this.validateSampledSignatures(t.files,hs.HOT_CACHE_SAMPLE_SIZE)?this.cloneMenus(t.menus):(hs.hotCache.delete(e),null):null}updateHotCache(e,t,i){if(hs.hotCache.set(e,{loadedAt:Date.now(),files:t,menus:this.cloneMenus(i)}),hs.hotCache.size<=hs.HOT_CACHE_MAX_ENTRIES)return;let s=null,n=Number.MAX_SAFE_INTEGER;for(const[e,t]of hs.hotCache.entries())t.loadedAt<n&&(n=t.loadedAt,s=e);s&&hs.hotCache.delete(s)}async validateSampledSignatures(e,t){if(!Array.isArray(e)||0===e.length)return!1;if(e.length<=t)return this.validateFileSignatures(e);const i=[],s=new Set,n=Math.max(2,t),r=Math.max(1,Math.floor((e.length-1)/(n-1)));for(let t=0;t<n;t++){const o=t===n-1?e.length-1:Math.min(t*r,e.length-1);s.has(o)||(s.add(o),i.push(e[o]))}return this.validateFileSignatures(i)}cloneMenus(e){return JSON.parse(JSON.stringify(e))}async validateFileSignatures(e){if(!Array.isArray(e)||0===e.length)return!1;const[t,...i]=e;return!!await this.isSignatureMatched(t)&&(await this.mapWithConcurrency(i,hs.MAX_STAT_CONCURRENCY,async e=>this.isSignatureMatched(e))).every(e=>!0===e)}async collectFileSignatures(e){return(await this.mapWithConcurrency(e,hs.MAX_STAT_CONCURRENCY,async e=>{try{const t=await c.promises.stat(e);return t.isFile()?{path:e,size:t.size,mtimeMs:t.mtimeMs}:null}catch{return null}})).filter(e=>!!e)}async isSignatureMatched(e){try{const t=await c.promises.stat(e.path);return t.isFile()&&t.size===e.size&&t.mtimeMs===e.mtimeMs}catch{return!1}}async mapWithConcurrency(e,t,i){if(0===e.length)return[];const s=Math.max(1,Math.min(t,e.length)),n=new Array(e.length);let r=0;return await Promise.all(Array.from({length:s},()=>(async()=>{let t=r;for(r+=1;t<e.length;)n[t]=await i(e[t]),t=r,r+=1})())),n}}class cs{static updateValues(e,t){const i=e;Object.prototype.hasOwnProperty.call(t.values,i.name)&&i.type!==h.choice&&(i.value=i.type===h.hex?t.values[i.name].toString(16):t.values[i.name]),Object.prototype.hasOwnProperty.call(t.visible,i.id)&&(i.isVisible=t.visible[i.id]),Object.prototype.hasOwnProperty.call(t.ranges,i.name)&&(i.range=t.ranges[i.name]);for(let e=0;e<i.children.length;e++)i.children[e]=this.updateValues(i.children[e],t),i.type===h.choice&&(t.values[i.children[e].name]?i.value=i.children[e].name:i.children[e].value=!1);return i}workspaceFolder;targetFile;constructor(e,t){this.workspaceFolder=e,this.targetFile=t}async loadKconfigMenus(){if(this.targetFile){const e=this.targetFile.fsPath;if(c.existsSync(e)){T.info(`Parsing specific Kconfig file: ${e}`);try{const t=await this.parseMenusWithCache(e);return 0===t.length?(T.warn("No menus parsed from target Kconfig file, using demo menus"),this.createDemoMenus()):(T.info(`Successfully parsed ${t.length} menus from target Kconfig file`),t)}catch(e){return T.error("Failed to parse target Kconfig file",e),this.createDemoMenus()}}else T.warn(`Target Kconfig file not found: ${e}`)}const e=this.findKconfigFiles();if(0===e.length)return T.warn("No Kconfig files found, using demo menus"),this.createDemoMenus();const t=e.find(e=>"Kconfig"===a.basename(e))||e[0];try{const e=await this.parseMenusWithCache(t);return 0===e.length?(T.warn("No menus parsed from Kconfig files, using demo menus"),this.createDemoMenus()):(T.info(`Successfully parsed ${e.length} menus from Kconfig files`),e)}catch(e){return T.error("Failed to parse Kconfig files",e),this.createDemoMenus()}}async parseMenusWithCache(e){const t=new hs(this.workspaceFolder.fsPath),i=hs.buildCacheKey(e),s=await t.load(i);if(s&&s.length>0)return T.info(()=>`[SESSION_CACHE] Loaded ${s.length} menus from cache: ${e}`),s;const n=new as({workspaceFolder:this.workspaceFolder.fsPath,mainKconfigFile:e}),r=await n.parse();return r.length>0&&await t.save(i,r,n.getParsedFiles()),r}mapJsonToMenuObject(e){const t={id:e.id,name:e.name,help:x(e.help),range:e.range,title:e.title,type:e.type,isCollapsed:!1,isMenuconfig:e.is_menuconfig,isVisible:!1,dependsOn:e.depends_on,children:[],value:null,select:[],selectedBy:[],hasPrompt:!0};for(const i of e.children){const e=this.mapJsonToMenuObject(i);t.children.push(e)}return t}findKconfigFiles(){const e=[],t=["Kconfig","kconfig","Config.in","Kconfig.projbuild","Kconfig.in"];for(const i of t){const t=a.join(this.workspaceFolder.fsPath,i);c.existsSync(t)&&e.push(t)}const i=["components","main","src"];for(const s of i){const i=a.join(this.workspaceFolder.fsPath,s);if(c.existsSync(i))for(const s of t){const t=a.join(i,s);c.existsSync(t)&&e.push(t)}}return e}createDemoMenus(){const e=[],t={id:"main",name:"MAIN_MENU",title:"Main Menu",type:h.menu,isVisible:!0,children:this.createDemoConfigItems(),help:"",range:[],isCollapsed:!1,value:null,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};return e.push(t),e}createDemoConfigItems(){const e=[],t={id:"bool-example",name:"CONFIG_EXAMPLE_BOOL",title:"Enable Example Feature",type:h.bool,value:!0,help:"This is a demo boolean configuration option.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};e.push(t);const i={id:"string-example",name:"CONFIG_EXAMPLE_STRING",title:"Example String Value",type:h.string,value:"default",help:"This is a demo string configuration option.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};e.push(i);const s={id:"int-example",name:"CONFIG_EXAMPLE_INT",title:"Example Integer Value",type:h.int,value:100,range:[1,1e3],help:"This is a demo integer configuration option.",isVisible:!0,children:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};e.push(s);const n={id:"hex-example",name:"CONFIG_EXAMPLE_HEX",title:"Example Hex Value",type:h.hex,value:"0x1000",help:"This is a demo hex configuration option.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};e.push(n);const r={id:"choice-example",name:"CONFIG_EXAMPLE_CHOICE",title:"Example Choice",type:h.choice,value:"option1",help:"This is a demo choice configuration option.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0},o={id:"choice-option1",name:"CONFIG_EXAMPLE_CHOICE_OPTION1",title:"Option 1",type:h.bool,value:!0,isVisible:!0,children:[],help:"",range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0},a={id:"choice-option2",name:"CONFIG_EXAMPLE_CHOICE_OPTION2",title:"Option 2",type:h.bool,value:!1,isVisible:!0,children:[],help:"",range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};r.children=[o,a],e.push(r);const l={id:"submenu-example",name:"SUBMENU_EXAMPLE",title:"Example Submenu",type:h.menu,isVisible:!0,children:this.createSubMenuItems(),help:"",range:[],isCollapsed:!1,value:null,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};return e.push(l),e}createSubMenuItems(){const e=[],t={id:"sub-bool-example",name:"CONFIG_SUB_EXAMPLE_BOOL",title:"Sub Example Bool",type:h.bool,value:!1,help:"This is a demo boolean configuration in a submenu.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};e.push(t);const i={id:"sub-string-example",name:"CONFIG_SUB_EXAMPLE_STRING",title:"Sub Example String",type:h.string,value:"submenu-default",help:"This is a demo string configuration in a submenu.",isVisible:!0,children:[],range:[],isCollapsed:!1,dependsOn:"",isMenuconfig:!1,select:[],selectedBy:[],hasPrompt:!0};return e.push(i),e}}function us(e,t=[]){return{id:e.id,name:e.name,title:e.title,type:e.type,value:e.value,children:t,isVisible:e.isVisible,isCollapsed:e.isCollapsed,isMenuconfig:e.isMenuconfig,hasPrompt:e.hasPrompt,range:e.range?[...e.range]:void 0,select:e.select?[...e.select]:void 0,selectedBy:e.selectedBy?[...e.selectedBy]:void 0,isReadonly:e.isReadonly,readonlyReason:e.readonlyReason,isImplicitContainer:e.isImplicitContainer,isContainerVisible:e.isContainerVisible,allowedTristateValues:e.allowedTristateValues?[...e.allowedTristateValues]:void 0,autoSelectedValue:e.autoSelectedValue,autoImpliedValue:e.autoImpliedValue,isMainMenu:e.isMainMenu,indentLevel:e.indentLevel,shouldIndentChildren:e.shouldIndentChildren,help:e.help}}class ds{static instance;fileWatcher;context;ignoreNextChangeTimestamp=0;constructor(e){this.context=e,ds.instance=this}static getInstance(){return ds.instance}ignoreNextChange(e=1e3){this.ignoreNextChangeTimestamp=Date.now()+e}initialize(){const e=o.workspace.workspaceFolders?.[0];if(!e)return;const t=new o.RelativePattern(e,"**/{sdkconfig,defconfig,.config}");this.fileWatcher=o.workspace.createFileSystemWatcher(t),this.fileWatcher.onDidCreate(e=>{Date.now()<this.ignoreNextChangeTimestamp||this.handleConfigFileChange(e)}),this.fileWatcher.onDidChange(e=>{this.handleConfigFileChange(e)}),this.fileWatcher.onDidDelete(e=>{Date.now()<this.ignoreNextChangeTimestamp||o.window.showWarningMessage("Configuration file has been deleted.")}),this.context.subscriptions.push(this.fileWatcher)}handleConfigFileChange(e){if(Date.now()<this.ignoreNextChangeTimestamp)return;const t=e.fsPath.split("/").pop()||"Unknown";o.window.showInformationMessage(`Configuration file ${t} has been modified externally.`)}dispose(){this.fileWatcher&&this.fileWatcher.dispose()}}class ps{evaluator;defaultValues;constructor(e,t){this.defaultValues=e,this.evaluator=t||new ns}updateContext(e){this.evaluator.updateContext(e)}collectAssignments(e){const t=[],i=new Set,s=e=>{for(const n of e){if(n.name&&!i.has(n.name)&&n.type!==h.menu&&n.type!==h.choice){if(i.add(n.name),this.shouldSkipSymbol(n))continue;const e=this.serializeMenuValue(n);e&&t.push(e)}n.children&&n.children.length>0&&s(n.children)}};return s(e),t}async write(e){const t=e.assignments??this.collectAssignments(e.menus);e.configOut&&await this.writeConfigFile(e.configOut,e.menus,e.configHeader,!1!==e.saveOld),e.headerOut&&await this.writeHeaderFile(e.headerOut,e.menus,e.headerHeader),e.defconfigOut&&await this.writeDefconfigFile(e.defconfigOut,t,e.configHeader)}async writeConfigFile(e,t,i,s=!0){const n=this.generateConfigLines(t);let r=i||"";n.length>0&&(r&&!r.endsWith("\n")&&(r+="\n"),r+=n.join("\n"),r.endsWith("\n")||(r+="\n")),await this.writeFileIfChanged(e,r,s)}async writeHeaderFile(e,t,i){const s=this.generateHeaderLines(t);let n=i||"";s.length>0&&(n&&!n.endsWith("\n")&&(n+="\n"),n+=s.join("\n"),n.endsWith("\n")||(n+="\n")),await this.writeFileIfChanged(e,n,!1)}async writeDefconfigFile(e,t,i){const s=t.map(e=>this.formatDefconfigLine(e)).filter(e=>e.length>0);let n=i||"";s.length>0&&(n&&!n.endsWith("\n")&&(n+="\n"),n+=s.join("\n"),n.endsWith("\n")||(n+="\n")),await this.writeFileIfChanged(e,n,!1)}generateConfigLines(e){const t=[],i=new Set,s=[{items:e,index:0,printedHeader:!1,contentStartIndex:t.length,hasChildNodes:e.length>0}];let n=!1;for(;s.length>0;){const e=s[s.length-1];if(e.index>=e.items.length){s.pop(),e.parentMenu&&e.printedHeader&&e.parentTitle&&(t.length>e.contentStartIndex||e.hasChildNodes)&&(t.push(`# end of ${e.parentTitle}`),n=!0);continue}const r=e.items[e.index++];if(r.type===h.menu){const e=this.getMenuTitle(r),i=this.shouldPrintMenuHeader(r)&&!!e;i&&e&&(0!==t.length&&""===t[t.length-1]||t.push(""),t.push("#"),t.push(`# ${e}`),t.push("#"),n=!1);const o=r.children&&r.children.length>0?r.children:[];s.push({items:o,index:0,parentMenu:r,parentTitle:e,printedHeader:i&&!!e,contentStartIndex:t.length,hasChildNodes:o.length>0});continue}if(r.type===h.choice){const e=r.children&&r.children.length>0?r.children:[];e.length>0&&s.push({items:e,index:0,printedHeader:!1,contentStartIndex:t.length,hasChildNodes:e.length>0});continue}if(r.name&&!i.has(r.name)){if(i.add(r.name),this.shouldSkipSymbol(r)){r.children&&r.children.length>0&&s.push({items:r.children,index:0,printedHeader:!1,contentStartIndex:t.length,hasChildNodes:r.children.length>0});continue}if(!this.shouldWriteToConfig(r)){r.children&&r.children.length>0&&s.push({items:r.children,index:0,printedHeader:!1,contentStartIndex:t.length,hasChildNodes:r.children.length>0});continue}n&&(0!==t.length&&""===t[t.length-1]||t.push(""),n=!1);const e=this.formatConfigLine(r);e&&t.push(e)}r.children&&r.children.length>0&&s.push({items:r.children,index:0,printedHeader:!1,contentStartIndex:t.length,hasChildNodes:r.children.length>0})}return t}getMenuTitle(e){if(!e)return"";const t=e.title&&e.title.trim().length>0?e.title.trim():void 0;if(t)return t;return(e.prompt&&e.prompt.trim().length>0?e.prompt.trim():void 0)||(e.name?e.name.trim():"")}shouldPrintMenuHeader(e){return!!e&&(!e.isMainMenu&&(!!this.isDependencySatisfied(e.dependsOn)&&this.getMenuTitle(e).length>0))}isDependencySatisfied(e){if(!e)return!0;const t=e.trim();return""===t||"y"===t||this.evaluator.evaluate(t)}shouldWriteToConfig(e){if(!1===e.hasPrompt)return this.shouldWritePromptless(e);const t=this.isDependencySatisfied(e.dependsOn);return t||T.debugWriter(`Skipping ${e.name} due to unsatisfied dependencies: ${e.dependsOn||"none"}`),t}shouldWritePromptless(e){switch(e.type){case h.bool:case h.tristate:return"n"!==this.toTristate(e.value);case h.int:case h.hex:case h.string:return this.hasActiveDefault(e);default:return!1}}hasActiveDefault(e){if(!e.defaults||0===e.defaults.length)return!1;for(const t of e.defaults){if(!t.condition||0===t.condition.trim().length)return!0;try{if(this.evaluator.evaluate(t.condition))return!0}catch(e){continue}}return!1}shouldSkipSymbol(e){return!(!e||!e.optionDefconfigList&&!e.optionEnvVar)}generateHeaderLines(e){const t=[],i=new Set,s=e=>{for(const n of e){if(n.name&&!i.has(n.name)&&n.type!==h.menu&&n.type!==h.choice){if(i.add(n.name),this.shouldSkipSymbol(n))continue;const e=this.formatHeaderLines(n);t.push(...e)}n.children&&n.children.length>0&&s(n.children)}};return s(e),t}formatConfigLine(e){const t="CONFIG_"+e.name;switch(e.type){case h.bool:case h.tristate:{const i=this.toTristate(e.value);return"n"===i?`# ${t} is not set`:`${t}=${i}`}case h.int:{const i=this.normalizeIntValue(e);return null===i?"":`${t}=${i}`}case h.hex:{const i=this.normalizeHexValue(e);return i?`${t}=${i}`:""}case h.string:{const i=this.normalizeStringValue(e);return null===i?"":`${t}="${this.escapeString(i)}"`}default:return""}}formatHeaderLines(e){const t="CONFIG_"+e.name;switch(e.type){case h.bool:case h.tristate:{const i=this.toTristate(e.value);return"y"===i?[`#define ${t} 1`]:"m"===i?[`#define ${t}_MODULE 1`]:[]}case h.int:{const i=this.normalizeIntValue(e);return null===i?[]:[`#define ${t} ${i}`]}case h.hex:{const i=this.normalizeHexValue(e);return i?[`#define ${t} ${i}`]:[]}case h.string:{const i=this.normalizeStringValue(e);return null===i?[]:[`#define ${t} "${this.escapeString(i)}"`]}default:return[]}}formatDefconfigLine(e){const t="CONFIG_"+e.name;switch(e.type){case h.bool:case h.tristate:{const i=e.value;return"n"===i?`# ${t} is not set`:`${t}=${i}`}case h.int:case h.hex:return`${t}=${e.value}`;case h.string:return`${t}="${this.escapeString(String(e.value))}"`;default:return""}}serializeMenuValue(e){if(!e.name)return null;if(this.shouldSkipSymbol(e))return null;switch(e.type){case h.bool:case h.tristate:{const t=this.toTristate(e.value),i=this.defaultValues.get(e.name);return t===this.toTristate(i)?null:{name:e.name,type:e.type,value:t}}case h.int:{const t=this.normalizeIntValue(e),i=this.normalizeDefaultInt(this.defaultValues.get(e.name));return null===t&&null===i||null!==t&&null!==i&&t===i||null===t?null:{name:e.name,type:e.type,value:t}}case h.hex:{const t=this.normalizeHexValue(e),i=this.normalizeDefaultHex(this.defaultValues.get(e.name));return t||i?t&&i&&t.toLowerCase()===i.toLowerCase()?null:t?{name:e.name,type:e.type,value:t}:null:null}case h.string:{const t=this.normalizeStringValue(e),i=this.normalizeDefaultString(this.defaultValues.get(e.name));return null===t&&null===i||null!==t&&null!==i&&t===i||null===t?null:{name:e.name,type:e.type,value:t}}default:return null}}expandStringValue(e){return e?e.replace(/\$\(([^)]+)\)|\$([A-Za-z_][A-Za-z0-9_]*)/g,(e,t,i)=>{const s=t||i;if(!s)return"";const n=process.env[s];return void 0!==n?n:""}):e}normalizeIntValue(e){const t=e.value;if(null==t||""===t)return null;const i="number"==typeof t?t:parseInt(t.toString(),10);if(Number.isNaN(i))return null;if(e.range&&e.range.length>=2){const[t,s]=e.range;let n=i;return Number.isFinite(t)&&n<t&&(n=t),Number.isFinite(s)&&n>s&&(n=s),n}return i}normalizeHexValue(e){const t=e.value;if(null==t||""===t)return"";let i=null;if("number"==typeof t)i=t;else if("string"==typeof t){const e=t.startsWith("0x")||t.startsWith("0X")?t.slice(2):t,s=parseInt(e,16);Number.isNaN(s)||(i=s)}if(null!==i){if(e.range&&e.range.length>=2){const[t,s]=e.range;Number.isFinite(t)&&i<t?i=t:Number.isFinite(s)&&i>s&&(i=s)}return"0x"+i.toString(16).toUpperCase()}const s=t.toString();return s.startsWith("0x")||s.startsWith("0X")?"0x"+s.slice(2).toUpperCase():"0x"+s.toUpperCase()}normalizeStringValue(e){const t=e.value;return null==t?null:this.expandStringValue(t.toString())}normalizeDefaultInt(e){if(null==e||""===e)return null;const t="number"==typeof e?e:parseInt(e.toString(),10);return Number.isNaN(t)?null:t}normalizeDefaultHex(e){if(null==e||""===e)return null;if("string"==typeof e&&(e.startsWith("0x")||e.startsWith("0X")))return e;const t="number"==typeof e?e:parseInt(e.toString(),16);return Number.isNaN(t)?null:"0x"+t.toString(16).toUpperCase()}normalizeDefaultString(e){return null==e?null:this.expandStringValue(e.toString())}toTristate(e){return!0===e||"y"===e||"Y"===e||2===e?"y":"m"===e||"M"===e||1===e?"m":"n"}escapeString(e){return e.replace(/\\/g,"\\\\").replace(/"/g,'\\"')}async writeFileIfChanged(e,t,i){let s=null;try{s=await c.promises.readFile(e,"utf8")}catch(e){s=null}s!==t&&(i&&null!==s&&await this.saveOldFile(e,s),await c.promises.writeFile(e,t,"utf8"))}async saveOldFile(e,t){const i=`${e}.old`;try{await c.promises.writeFile(i,t,"utf8")}catch(e){}}}class fs extends m.EventEmitter{static instance=null;serverProcess=null;receivedDataBuffer="";kconfigMenus=[];defaultValues=new Map;workspaceFolder;kconfigFile;configFile;isRunning=!1;unsavedChanges=!1;visibilityManager;kconfigWriter;menuIndex=new Map;menuNameIndex=new Map;choiceParentByChildId=new Map;menuParentByChildId=new Map;menuStateCache=new Map;constructor(e){if(super(),this.workspaceFolder=e.workspaceFolder,this.kconfigFile=e.kconfigFile,e.configFile)this.configFile=e.configFile;else{const t=a.dirname(e.kconfigFile);this.configFile=a.join(t,".config")}this.visibilityManager=new rs,this.kconfigWriter=new ps(this.defaultValues,this.visibilityManager.getEvaluator())}static async init(e){return fs.instance&&fs.instance.dispose(),fs.instance=new fs(e),await fs.instance.start(),fs.instance}static getInstance(){return fs.instance}async start(){this.isRunning=!0;const e=o.Uri.file(this.kconfigFile),t=new cs(this.workspaceFolder,e);this.kconfigMenus=await t.loadKconfigMenus(),this.saveDefaultValues(this.kconfigMenus),this.rebuildMenuCaches(),c.existsSync(this.configFile)&&await this.loadConfigValues(),this.reconcileChoicesFromChildren(),T.info(()=>`[KCONFIG_SERVER] Initializing visibility manager with ${this.kconfigMenus.length} menus`),this.visibilityManager.initialize(this.kconfigMenus),this.forceTopLevelMenusVisible(this.kconfigMenus),this.rebuildMenuCaches(),T.info(()=>`[KCONFIG_SERVER] Initialized with ${this.kconfigMenus.length} menus and visibility manager`),this.emit("ready",this.kconfigMenus)}getMenus(){return this.kconfigMenus}async reloadFromDisk(){const e=new cs(this.workspaceFolder,o.Uri.file(this.kconfigFile));return this.kconfigMenus=await e.loadKconfigMenus(),this.saveDefaultValues(this.kconfigMenus),this.rebuildMenuCaches(),c.existsSync(this.configFile)&&await this.loadConfigValues(),this.visibilityManager.initialize(this.kconfigMenus),this.forceTopLevelMenusVisible(this.kconfigMenus),this.rebuildMenuCaches(),T.info(()=>"[KCONFIG_SERVER] Reloaded from disk: "+this.kconfigMenus.length+" menus"),this.kconfigMenus}getVisibilityManager(){return this.visibilityManager}hasUnsavedChanges(){return this.unsavedChanges}getMenuDetailById(e){const t=this.menuIndex.get(e);if(!t)return null;const i=function(e){return{help:e.help,prompt:e.prompt,directDepExpr:e.directDepExpr,directDepValue:e.directDepValue,sourceFile:e.sourceFile,sourceFiles:e.sourceFiles?[...e.sourceFiles]:void 0,linenr:e.linenr,menuPath:e.menuPath,dependsOn:e.dependsOn,defaults:e.defaults?e.defaults.map(e=>({...e})):void 0,selectInfo:e.selectInfo,selectedByInfo:e.selectedByInfo,implyInfo:e.implyInfo}}(t);return i.prompt||(i.prompt=t.title||t.name||""),!i.directDepExpr&&t.dependsOn&&""!==t.dependsOn.trim()&&"y"!==t.dependsOn.trim()&&(i.directDepExpr=t.dependsOn),i.menuPath||(i.menuPath=this.buildMenuPath(e)),i}updateValue(e){this.unsavedChanges=!0;const t=this.menuIndex.get(e.id);if(!t)return;let i=e.value;if((t.type===h.int||t.type===h.hex)&&t.range&&t.range.length>=2){const e=t.range[0],s=t.range[1],n="number"==typeof i?i:parseInt(i.toString(),10);isNaN(n)||(n<e?i=e:n>s&&(i=s))}t.value=i,this.kconfigMenus=this.visibilityManager.updateValue(t.id,i);const s=this.visibilityManager.consumeLastAffectedMenuIds(),n=this.collectChangesForAffectedMenus(s);n.length>0&&this.emit("visibilityChanged",n)}async saveConfig(){this.logCurrentValues("[SAVE] Values before save");try{const e=this.kconfigWriter.collectAssignments(this.kconfigMenus),t=await this.resolveHeaderPath();ds.getInstance()?.ignoreNextChange(),await this.kconfigWriter.write({menus:this.kconfigMenus,assignments:e,configOut:this.configFile,headerOut:t||void 0,configHeader:void 0,headerHeader:t?this.getAutoHeader():void 0,saveOld:!0}),this.unsavedChanges=!1,this.emit("configSaved")}catch(e){T.error("Failed to save configuration",e),o.window.showErrorMessage(`Failed to save configuration: ${e}`)}}async saveDefconfig(e){try{const t=this.kconfigWriter.collectAssignments(this.kconfigMenus),i=a.join(a.dirname(this.configFile),"defconfig"),s=e||i;await this.kconfigWriter.write({menus:this.kconfigMenus,assignments:t,defconfigOut:s,configHeader:void 0,saveOld:!1}),o.window.showInformationMessage("Default configuration saved to "+s)}catch(e){T.error("Failed to save defconfig",e),o.window.showErrorMessage("Failed to save defconfig: "+e)}}exportConfigText(){const e=[],t=this.getConfigHeader();return t&&e.push(t),e.push(...this.kconfigWriter.generateConfigLines(this.kconfigMenus)),e.join("\n")+(e.length>0?"\n":"")}async resetToDefaults(){if(ds.getInstance()?.ignoreNextChange(),c.existsSync(this.configFile))try{await c.promises.unlink(this.configFile)}catch(e){}this.resetMenuValuesToDefaults(),this.visibilityManager.initialize(this.kconfigMenus),this.forceTopLevelMenusVisible(this.kconfigMenus),this.rebuildMenuCaches(),this.unsavedChanges=!0,this.emit("configReset",this.kconfigMenus)}async discardChanges(){ds.getInstance()?.ignoreNextChange(),this.resetMenuValuesToDefaults(),c.existsSync(this.configFile)&&await this.loadConfigValues(),this.rebuildMenuCaches(),this.visibilityManager.initialize(this.kconfigMenus),this.forceTopLevelMenusVisible(this.kconfigMenus),this.unsavedChanges=!1,this.emit("changesDiscarded",this.kconfigMenus)}resetMenuValuesToDefaults(){const e=t=>{for(const i of t){if(i.type!==h.menu&&i.name&&i.type!==h.choice){const e=this.defaultValues.get(i.name);i.value=void 0!==e?e:null}i.children&&e(i.children)}};e(this.kconfigMenus),this.reconcileChoicesFromChildren()}async loadConfigValues(){try{const e=(await c.promises.readFile(this.configFile,"utf8")).split("\n");T.info(()=>`[LOAD_CONFIG] Reading config file: ${this.configFile}`),T.info(()=>`[LOAD_CONFIG] Total lines in config: ${e.length}`);let t=0,i=0;for(const s of e){const e=s.trim();if(!e){i++;continue}if(e.startsWith("#")){const s=e.match(/^#\s*CONFIG_([A-Z0-9_]+)\s+is\s+not\s+set$/);if(s){const e=s[1];this.updateIndexedMenuValues(e,"n")&&t++;continue}i++;continue}const n=e.match(/^CONFIG_([A-Z0-9_]+)=(.+)$/);if(n){const e=n[1],i=n[2];this.updateIndexedMenuValues(e,i)&&t++;continue}i++}T.info(()=>`[LOAD_CONFIG] Processed ${t} config lines, skipped ${i} lines`),this.reconcileChoicesFromChildren();const s=e=>{const t=this.findMenuByName(e);return t?`name=${e}, value=${t.value}`:`name=${e} not found`};T.info("[LOAD_CONFIG] Memory allocator status after load:"),T.info("[LOAD_CONFIG]   "+s("RT_USING_SMALL_MEM")),T.info("[LOAD_CONFIG]   "+s("RT_USING_SLAB")),T.info("[LOAD_CONFIG]   "+s("RT_USING_SMALL_MEM_AS_HEAP")),T.info("[LOAD_CONFIG]   "+s("RT_USING_SLAB_AS_HEAP"));const n=this.findParentChoice("RT_USING_SMALL_MEM_AS_HEAP")||this.findParentChoice("RT_USING_SLAB_AS_HEAP");n&&T.info(()=>`[LOAD_CONFIG]   choice(System Heap) selected: ${n.value}`)}catch(e){T.error("Failed to load config values",e)}}reconcileChoicesFromChildren(){const e=t=>{for(const i of t){if(i.type===h.choice&&i.children&&i.children.length>0){let e=null;for(const t of i.children)t.type===h.bool&&!0===t.value&&(e=t.name);if(!e&&i.defaults&&i.defaults.length>0)for(const t of i.defaults)if(!t.condition||"y"===t.condition.trim()){e=t.value;break}if(e){i.value=e;for(const t of i.children)t.value=t.name===e}}i.children&&i.children.length>0&&e(i.children)}};e(this.kconfigMenus)}updateMenuValueByName(e,t){return this.updateIndexedMenuValues(e,t)}async resolveHeaderPath(){const e=o.workspace.getConfiguration("imde.guiConfig");let t=e.get("autoHeaderPath","")?.trim()||"";if(!t)return null;if(!a.isAbsolute(t)){const e=a.dirname(this.configFile);t=a.join(e,t)}return await c.promises.mkdir(a.dirname(t),{recursive:!0}),t}getConfigHeader(){return"#\n# Automatically generated file; DO NOT EDIT.\n#\n\n"}getAutoHeader(){return"/*\n * Automatically generated file; DO NOT EDIT.\n */\n\n"}saveDefaultValues(e){const t=(e,i=0)=>{"  ".repeat(i);for(const s of e)s.type!==h.menu&&s.name&&this.defaultValues.set(s.name,s.value),s.children&&t(s.children,i+1)};t(e)}findMenuByName(e){const t=i=>{for(const s of i){if(s.name===e)return s;if(s.children&&s.children.length>0){const e=t(s.children);if(e)return e}}return null};return t(this.kconfigMenus)}formatHeaderLine(e,t){return""}findParentChoice(e){const t=this.menuNameIndex.get(e)||[];for(const e of t){const t=this.choiceParentByChildId.get(e.id);if(t)return t}return null}rebuildMenuCaches(){const e=new Map,t=new Map,i=new Map,s=new Map,n=new Map,r=this.kconfigMenus.map(e=>({menu:e,parentId:null}));for(;r.length>0;){const o=r.pop();if(!o||!o.menu)continue;const a=o.menu;if(e.set(a.id,a),s.set(a.id,o.parentId),n.set(a.id,this.snapshotMenuState(a)),a.name){const e=t.get(a.name)||[];e.push(a),t.set(a.name,e)}if(a.type===h.choice&&a.children&&a.children.length>0)for(const e of a.children)i.set(e.id,a);if(a.children&&a.children.length>0)for(let e=0;e<a.children.length;e++)r.push({menu:a.children[e],parentId:a.id})}this.menuIndex=e,this.menuNameIndex=t,this.choiceParentByChildId=i,this.menuParentByChildId=s,this.menuStateCache=n}buildMenuPath(e){const t=[];let i=this.menuParentByChildId.get(e)??null;for(;i;){const e=this.menuIndex.get(i);if(!e)break;const s=(e.title||e.prompt||e.name||"").trim();s&&t.unshift(s),i=this.menuParentByChildId.get(i)??null}return 0===t.length?"(Top)":`(Top) -> ${t.join(" -> ")}`}updateIndexedMenuValues(e,t){const i=this.menuNameIndex.get(e);if(!i||0===i.length)return!1;for(const e of i)this.applyConfigValueToMenu(e,t);return!0}applyConfigValueToMenu(e,t){switch(e.type){case h.bool:{e.value="y"===t;const i=this.choiceParentByChildId.get(e.id);if(i)if(!0===e.value){i.value=e.name;for(const t of i.children||[])t.name!==e.name&&t.type===h.bool&&(t.value=!1);T.info(()=>`[LOAD_CONFIG] Set parent choice "${i.title||i.name}" <- ${e.name}`)}else i.value===e.name&&(i.value=null);return}case h.tristate:{let i="n";const s=t.toLowerCase();return"y"===s||"2"===s?i="y":"m"!==s&&"1"!==s||(i="m"),void(e.value=i)}case h.int:return void(e.value=parseInt(t,10));case h.hex:return void(e.value=t);case h.string:return void(e.value=t.replace(/^"(.*)"$/,"$1"));case h.choice:return void(e.value="y"===t?e.name:null);default:return void(e.value=t)}}forceTopLevelMenusVisible(e){e.forEach(e=>{e.type!==h.menu||!e.hasPrompt||e.dependsOn&&""!==e.dependsOn.trim()||(e.isVisible=!0,e.isContainerVisible=!0),e.children&&e.children.length>0&&this.forceTopLevelMenusVisible(e.children)})}snapshotMenuState(e){return{type:e.type,value:e.value,isVisible:e.isVisible,isContainerVisible:e.isContainerVisible,isReadonly:e.isReadonly,readonlyReason:e.readonlyReason,selectedBy:e.selectedBy?[...e.selectedBy]:void 0,autoSelectedValue:e.autoSelectedValue,autoImpliedValue:e.autoImpliedValue}}collectChangesForAffectedMenus(e){const t=[];for(const i of e){const e=this.menuIndex.get(i);if(!e)continue;const s=this.menuStateCache.get(i),n=this.snapshotMenuState(e),r=!s||!this.areMenuValuesEqual(s.value,n.value,n.type),o=!s||s.isVisible!==n.isVisible||s.isContainerVisible!==n.isContainerVisible||s.isReadonly!==n.isReadonly||s.readonlyReason!==n.readonlyReason||this.arrayChanged(s.selectedBy,n.selectedBy)||s.autoSelectedValue!==n.autoSelectedValue||s.autoImpliedValue!==n.autoImpliedValue;(!s||o||r)&&t.push({id:e.id,isVisible:n.isVisible,isContainerVisible:n.isContainerVisible,isReadonly:n.isReadonly,readonlyReason:n.readonlyReason,selectedBy:n.selectedBy?[...n.selectedBy]:void 0,autoSelectedValue:n.autoSelectedValue,autoImpliedValue:n.autoImpliedValue,value:r||!s?e.value:void 0}),this.menuStateCache.set(i,n)}return t}areMenuValuesEqual(e,t,i){switch(i){case h.int:return Number(e)===Number(t);case h.hex:return void 0===e&&void 0===t||String(e||"").toLowerCase()===String(t||"").toLowerCase();default:return e===t}}arrayChanged(e,t){if(!e&&!t)return!1;if(!e||!t)return!0;if(e.length!==t.length)return!0;for(let i=0;i<e.length;i++)if(e[i]!==t[i])return!0;return!1}logCurrentValues(e){const t=(e,i=0)=>{"  ".repeat(i);for(const s of e)s.name&&null!==s.value&&s.value,s.children&&s.children.length>0&&t(s.children,i+1)};t(this.kconfigMenus)}dispose(){this.serverProcess&&(this.serverProcess.kill(),this.serverProcess=null),this.isRunning=!1,this.removeAllListeners(),fs.instance===this&&(fs.instance=null)}}var gs;!function(e){e.ZH_CN="zh-cn",e.EN_US="en-us"}(gs||(gs={}));const ms={[gs.ZH_CN]:{"common.confirm":"确定","common.cancel":"取消","reset.confirmTitle":"确认重置配置","reset.confirmMessage":"您确定要将所有配置重置为 Kconfig 默认值吗？这将删除当前的 .config 文件并恢复所有配置项到默认状态。此操作无法撤销。","reset.confirmButton":"确认重置","reset.cancelButton":"取消","reset.progress.title":"正在重置配置","reset.progress.clearing":"删除配置文件并恢复默认值","reset.progress.loading":"重新加载配置","reset.progress.complete":"重置完成","reset.success":"配置已成功重置为默认值","reset.failed":"重置失败","discard.confirmTitle":"确认丢弃更改","discard.confirmMessage":"您确定要丢弃所有未保存的更改吗？此操作无法撤销。","discard.success":"已成功丢弃所有未保存的更改","discard.failed":"丢弃更改失败","save.success":"配置已成功保存","save.failed":"保存配置失败","close.unsavedTitle":"未保存的更改","close.unsavedMessage":"配置编辑器中有未保存的更改，是否要在关闭前保存？","close.saveButton":"是","close.noSaveButton":"否","close.saveSuccess":"配置已保存","close.saveFailed":"保存失败，将继续关闭"},[gs.EN_US]:{"common.confirm":"Confirm","common.cancel":"Cancel","reset.confirmTitle":"Confirm Reset Configuration","reset.confirmMessage":"Are you sure you want to reset all configurations to Kconfig default values? This will delete the current .config file and restore all configuration items to their default state. This action cannot be undone.","reset.confirmButton":"Confirm Reset","reset.cancelButton":"Cancel","reset.progress.title":"Resetting Configuration","reset.progress.clearing":"Deleting configuration file and restoring defaults","reset.progress.loading":"Reloading configuration","reset.progress.complete":"Reset Complete","reset.success":"Configuration successfully reset to default values","reset.failed":"Reset Failed","discard.confirmTitle":"Confirm Discard Changes","discard.confirmMessage":"Are you sure you want to discard all unsaved changes? This action cannot be undone.","discard.success":"Successfully discarded all unsaved changes","discard.failed":"Failed to discard changes","save.success":"Configuration saved successfully","save.failed":"Failed to save configuration","close.unsavedTitle":"Unsaved Changes","close.unsavedMessage":"There are unsaved changes in the configuration editor. Do you want to save before closing?","close.saveButton":"Yes","close.noSaveButton":"No","close.saveSuccess":"Configuration saved","close.saveFailed":"Save failed, will continue closing"}};function ys(e){const t=o.env.language.toLowerCase().startsWith("zh")?gs.ZH_CN:gs.EN_US;return ms[t][e]||e}class ws{extContext;static currentPanel;static panelSeq=0;_disposed=!1;static supportedThemes=["modern","default"];static initialPayloadChunkSize=120;static initialPayloadTaskBatchSize=32;static startupSlowThresholdMs=1500;static createOrShow(e,t,i,s){const n=o.window.activeTextEditor?o.window.activeTextEditor.viewColumn:void 0;if(ws.currentPanel&&!ws.currentPanel.isDisposed())try{return void ws.currentPanel.panel.reveal(n)}catch(e){T.error("Failed to reveal existing panel, creating new one",e),ws.currentPanel=void 0}ws.currentPanel=new ws(e,n||o.ViewColumn.One,t,s,i)}isDisposed(){return this._disposed}static viewType="imdeGuiConfig";curWorkspaceFolder;panel;disposables=[];kconfigServer=null;targetFile;kconfigServerReady=!1;pendingInitValuesRequest=!1;initialPayloadTransferToken=0;lastInitialValuesSentAt=0;initializationToken=0;panelId;panelCreatedAt=Date.now();kconfigServerInitDurationMs=0;initialTransferSessionSeq=0;disposeFlowStarted=!1;constructor(e,t,i,s,r){this.extContext=r,this.panelId=++ws.panelSeq,this.curWorkspaceFolder=i,this.targetFile=s,this.trace(`constructor start target=${s?.fsPath||"(active)"}`);const l=s?`IMDE GUI Config - ${a.basename(s.fsPath)}`:"IMDE GUI Config";this.panel=o.window.createWebviewPanel(ws.viewType,l,t,{enableScripts:!0,retainContextWhenHidden:!0,localResourceRoots:[o.Uri.joinPath(e,"dist"),o.Uri.joinPath(e,"dist","views"),o.Uri.joinPath(e,"node_modules","@vscode","codicons","dist")]});const h=this.panel.webview.asWebviewUri(o.Uri.joinPath(e,"dist","views","webview-bundle.js")),c=this.resolveUiTheme(),u=this.mapColorThemeKind(o.window.activeColorTheme.kind),d=this.extContext.workspaceState.get("imde.guiThemeOverride","");this.panel.webview.html=this.createMenuconfigHtml(h,c,u,d),this.trace("webview html assigned"),this.registerColorThemeSync(),this.panel.webview.postMessage({command:"load_dictionary",text_dictionary:{apply:"Apply",discard:"Discard",reset:"Reset",save:"Save"}}),this.panel.onDidDispose(()=>{this.handlePanelDisposed()},null,this.disposables),this.panel.webview.onDidReceiveMessage(async e=>{switch(e.command){case"updateValue":{const t=JSON.parse(e.updated_value);this.kconfigServer?this.kconfigServer.updateValue(t):T.error("[PANEL] KconfigServer not available for updateValue");break}case"saveChanges":if(this.kconfigServer){if("Apply"!==await o.window.showInformationMessage("Apply changes to .config and reconfigure?",{modal:!0},"Apply"))break;try{await this.kconfigServer.saveConfig(),o.window.setStatusBarMessage(`$(check) ${ys("save.success")}`,3e3),o.commands.executeCommand("imde.configure").then(()=>{},()=>o.window.setStatusBarMessage("$(warning) Config saved but configure failed",5e3))}catch(e){const t=e instanceof Error?e.message:String(e);o.window.showErrorMessage(`${ys("save.failed")}: ${t}`),T.error("Save configuration failed",e)}}else o.window.setStatusBarMessage("$(check) Configuration saved!",3e3);break;case"discardChanges":if(this.kconfigServer)try{await this.kconfigServer.discardChanges(),o.window.setStatusBarMessage(`$(discard) ${ys("discard.success")}`,3e3)}catch(e){const t=e instanceof Error?e.message:String(e);o.window.showErrorMessage(`${ys("discard.failed")}: ${t}`),T.error("Discard changes failed",e)}else o.window.setStatusBarMessage("$(discard) Changes discarded!",3e3);break;case"requestInitValues":if(this.trace(`requestInitValues received ready=${this.kconfigServerReady} hasServer=${!!this.kconfigServer}`),!this.kconfigServerReady||!this.kconfigServer){this.pendingInitValuesRequest=!0,T.info("[PANEL] requestInitValues received before KconfigServer is ready; request queued.");break}this.sendInitialValues();break;case"refreshConfig":if(this.trace("refreshConfig received"),!this.kconfigServer)break;try{const e=await this.kconfigServer.reloadFromDisk();this.safelySendMenuData("refresh_values",e),o.window.setStatusBarMessage("$(refresh) Configuration refreshed",2e3)}catch(e){T.error("refreshConfig failed",e),o.window.showErrorMessage("Failed to refresh configuration")}break;case"setDefault":this.kconfigServer&&await o.window.withProgress({location:o.ProgressLocation.Notification,title:ys("reset.progress.title"),cancellable:!1},async e=>{try{e.report({increment:30,message:ys("reset.progress.clearing")}),await this.kconfigServer.resetToDefaults(),e.report({increment:60,message:ys("reset.progress.loading")});const t=this.kconfigServer.getMenus();this.safelySendMenuData("refresh_values",t),e.report({increment:100,message:ys("reset.progress.complete")}),o.window.setStatusBarMessage(`$(refresh) ${ys("reset.success")}`,3e3)}catch(e){const t=e instanceof Error?e.message:String(e);o.window.showErrorMessage(`${ys("reset.failed")}: ${t}`),T.error("Reset to defaults failed",e)}});break;case"requestMenuDetail":{if(!this.kconfigServer)break;const t="string"==typeof e.id?e.id:"";if(!t)break;try{const e=this.kconfigServer.getMenuDetailById(t);this.panel.webview.postMessage({command:"menu_detail",id:t,detail:e})}catch(e){T.error("Failed to send menu detail",e)}break}case"saveDefconfig":{if(!this.kconfigServer)break;const e=await o.window.showInputBox({prompt:"Save defconfig as...",placeHolder:"config/g32s10/g32s10_v1_defconfig",validateInput:e=>e.trim()?void 0:"Path is required"});if(e){const t=a.join(this.curWorkspaceFolder.fsPath,e.trim());try{const i=await this.kconfigServer.exportConfigText();await n(896).promises.mkdir(n(928).dirname(t),{recursive:!0}),await n(896).promises.writeFile(t,i,"utf8"),o.window.showInformationMessage("Config saved: "+e.trim())}catch(e){const t=e instanceof Error?e.message:String(e);o.window.showErrorMessage("Save failed: "+t),T.error("Save defconfig failed",e)}}break}default:T.error("Unrecognized command")}}),this.initializeKconfigServer()}dispose(){if(!this._disposed){this.trace("dispose requested");try{this.panel.dispose()}catch(e){T.error("Error disposing panel",e),this.disposeInternal(!0)}}}async handlePanelDisposed(){if(!this.disposeFlowStarted){this.disposeFlowStarted=!0,this.trace("onDidDispose fired");try{await async function(e){if(!e.hasUnsavedChanges)return;const t={title:e.text.saveButton,isCloseAffordance:!1},i={title:e.text.noSaveButton,isCloseAffordance:!0};if(await e.showWarningMessage(e.text.unsavedMessage,{modal:!0},t,i)===t)try{await e.saveConfig(),e.setStatusBarMessage(`$(check) ${e.text.saveSuccess}`,3e3)}catch{e.showErrorMessage(e.text.saveFailed)}}({hasUnsavedChanges:this.kconfigServer?.hasUnsavedChanges()??!1,saveConfig:async()=>{this.kconfigServer&&await this.kconfigServer.saveConfig()},showWarningMessage:async(e,t,...i)=>o.window.showWarningMessage(e,t,...i),showErrorMessage:e=>{o.window.showErrorMessage(e)},setStatusBarMessage:(e,t)=>{"number"!=typeof t?o.window.setStatusBarMessage(e):o.window.setStatusBarMessage(e,t)},text:{unsavedMessage:ys("close.unsavedMessage"),saveButton:ys("close.saveButton"),noSaveButton:ys("close.noSaveButton"),saveSuccess:ys("close.saveSuccess"),saveFailed:ys("close.saveFailed")}})}finally{this.disposeInternal(!1)}}}disposeInternal(e){if(!this._disposed){if(this.trace(`disposeInternal disposePanel=${e}`),this._disposed=!0,this.initializationToken+=1,this.initialPayloadTransferToken+=1,ws.currentPanel=void 0,this.kconfigServer&&(this.kconfigServer.dispose(),this.kconfigServer=null),e)try{this.panel.dispose()}catch(e){T.error("Error disposing panel",e)}for(;this.disposables.length;){const e=this.disposables.pop();if(e)try{e.dispose()}catch(e){T.error("Error disposing disposable",e)}}}}getExtensionPath(){const e=this.panel.webview.asWebviewUri(o.Uri.file(a.join("dummy"))).toString();return e.match(/^.*\/([a-z0-9-]+)\/dummy$/)?a.dirname(a.dirname(e.replace(/^.*\/\//,""))):""}async initializeKconfigServer(){const e=++this.initializationToken,t=Date.now();try{let i;if(this.trace("initializeKconfigServer start"),this.targetFile)i=this.targetFile.fsPath;else{const e=a.join(this.curWorkspaceFolder.fsPath,"Kconfig"),t=a.join(this.curWorkspaceFolder.fsPath,"imde.guiConfig");n(896).existsSync(e)?i=e:n(896).existsSync(t)&&(i=t)}if(i&&n(896).existsSync(i)){this.trace(`initializeKconfigServer init target=${i}`);const s=await fs.init({workspaceFolder:this.curWorkspaceFolder,kconfigFile:i});if(this._disposed||e!==this.initializationToken)return this.trace(`initializeKconfigServer stale result dropped token=${e}`),void s.dispose();this.kconfigServer=s,this.kconfigServerInitDurationMs=Date.now()-t,this.trace("initializeKconfigServer init done"),this.kconfigServer.on("configReset",e=>{this.safelySendMenuData("refresh_values",e)}),this.kconfigServer.on("changesDiscarded",e=>{for(let t=0;t<Math.min(e.length,5);t++)e[t].name;this.safelySendMenuData("refresh_values",e)}),this.kconfigServer.on("visibilityChanged",e=>{e&&0!==e.length&&this.sendVisibilityDelta(e)}),this.kconfigServerReady=!0,this.trace(`kconfigServer ready pendingInit=${this.pendingInitValuesRequest}`),this.pendingInitValuesRequest&&(this.pendingInitValuesRequest=!1,this.sendInitialValues())}}catch(e){this.kconfigServerInitDurationMs=Date.now()-t;const i=e instanceof Error?e.message:String(e);this.trace(`initializeKconfigServer failed: ${i}`),T.error("Failed to initialize KconfigServer",e),this.panel.webview.postMessage({command:"load_initial_values_error",error:i})}}sendInitialValues(){if(this._disposed||!this.kconfigServer)return void this.trace("sendInitialValues skipped no server");const e=Date.now();if(e-this.lastInitialValuesSentAt<250)return void this.trace("sendInitialValues throttled");this.lastInitialValuesSentAt=e,this.trace("sendInitialValues dispatch");const t=Date.now(),i=this.kconfigServer.getMenus(),s=Date.now()-t;this.setDefaultCollapsedState(i);const n=o.workspace.getConfiguration("imde.guiConfig.debug"),r={enabled:n.get("enabled",!1),menu:n.get("menu",!1),startup:n.get("startup",!1),startupSlowThresholdMs:n.get("startupSlowThresholdMs",ws.startupSlowThresholdMs)};this.safelySendMenuData("load_initial_values",i,{debugConfig:r,startupMetrics:{sessionId:++this.initialTransferSessionSeq,panelAgeMs:Date.now()-this.panelCreatedAt,serverInitMs:this.kconfigServerInitDurationMs,getMenusMs:s}})}setDefaultCollapsedState(e){const t=e=>{e.forEach(e=>{e.type===h.menu&&(e.isCollapsed=!0),e.children&&e.children.length>0&&t(e.children)})};t(e)}safelySendMenuData(e,t,i={}){if(this._disposed)this.trace(`safelySendMenuData skipped disposed command=${e}`);else{this.trace(`safelySendMenuData command=${e} menus=${t?.length||0}`),t.length;try{if("load_initial_values"===e){const e=Date.now(),{skeletonMenus:s,chunks:n}=function(e,t){const i=Number.isFinite(t)&&t>0?Math.floor(t):20,s=[],n=e.map(e=>us(e,[])),r=[...e];for(;r.length>0;){const e=r.shift();if(!e||!e.id)continue;const t=e.children||[];if(0===t.length)continue;const n=t.map(e=>us(e,[]));for(let t=0;t<n.length;t+=i){const r=n.slice(t,t+i);r.length>0&&s.push({parentId:e.id,children:r})}for(const e of t)r.push(e)}return{skeletonMenus:n,chunks:s}}(t,ws.initialPayloadChunkSize),r=Date.now()-e,o=function(e,t){if(!Array.isArray(e)||0===e.length)return[];const i=Number.isFinite(t)&&t>0?Math.floor(t):16,s=[];for(let t=0;t<e.length;t+=i)s.push(e.slice(t,t+i));return s}(n,ws.initialPayloadTaskBatchSize),a=i?.startupMetrics||{},l={sessionId:"number"==typeof a.sessionId?a.sessionId:++this.initialTransferSessionSeq,panelAgeMs:"number"==typeof a.panelAgeMs?a.panelAgeMs:Date.now()-this.panelCreatedAt,serverInitMs:"number"==typeof a.serverInitMs?a.serverInitMs:this.kconfigServerInitDurationMs,getMenusMs:"number"==typeof a.getMenusMs?a.getMenusMs:0,serializeMs:r,totalChunks:n.length,totalTaskBatches:o.length},h={...i||{}};delete h.startupMetrics;const c=++this.initialPayloadTransferToken;this.trace(`initial payload begin token=${c} roots=${s.length} chunks=${n.length} taskBatches=${o.length}`),this.panel.webview.postMessage({command:"load_initial_values_begin",menus:s,meta:{totalChunks:n.length,chunkSize:ws.initialPayloadChunkSize,totalTaskBatches:o.length,taskBatchSize:ws.initialPayloadTaskBatchSize,startup:l},...h});const u=Date.now();return void this.streamInitialPayloadChunks(o,c,0,0,n.length,l,u)}const s={command:e,menus:t,...i};this.panel.webview.postMessage(s)}catch(t){T.error(`Failed to send ${e} data to webview`,t),o.window.showErrorMessage(`Failed to update configuration display. ${t instanceof Error?t.message:"Unknown error"}`)}}}streamInitialPayloadChunks(e,t,i,s,n,r,o){if(this._disposed||t!==this.initialPayloadTransferToken)return void this.trace(`streamInitialPayloadChunks cancelled token=${t} current=${this.initialPayloadTransferToken} disposed=${this._disposed}`);if(i>=e.length)return this.trace(`initial payload end token=${t} chunks=${n}`),void this.panel.webview.postMessage({command:"load_initial_values_end",totalChunks:n,startup:{sessionId:r.sessionId,streamMs:Date.now()-o,panelToEndMs:Date.now()-this.panelCreatedAt}});const a=e[i],l=a.map((e,t)=>({parentId:e.parentId,menus:e.children,chunkIndex:s+t+1,totalChunks:n}));this.panel.webview.postMessage({command:"load_initial_values_batch",chunks:l,batchIndex:i+1,totalBatches:e.length}),i+1<e.length?setTimeout(()=>{this.streamInitialPayloadChunks(e,t,i+1,s+a.length,n,r,o)},0):(this.trace(`initial payload end token=${t} chunks=${n}`),this.panel.webview.postMessage({command:"load_initial_values_end",totalChunks:n,startup:{sessionId:r.sessionId,streamMs:Date.now()-o,panelToEndMs:Date.now()-this.panelCreatedAt}}))}trace(e){T.debug(()=>`[PANEL:${this.panelId}] ${e}`)}sendVisibilityDelta(e){if(this._disposed)this.trace("sendVisibilityDelta skipped disposed");else try{this.panel.webview.postMessage({command:"visibility_delta",changes:e})}catch(e){T.error("Failed to send visibility delta",e)}}resolveUiTheme(){const e=o.workspace.getConfiguration("imde.guiConfig").get("uiTheme",ws.supportedThemes[0]);return e&&ws.supportedThemes.includes(e)?e:ws.supportedThemes[0]}mapColorThemeKind(e){switch(e){case o.ColorThemeKind.Light:case o.ColorThemeKind.HighContrastLight:return"light";case o.ColorThemeKind.Dark:case o.ColorThemeKind.HighContrast:default:return"dark"}}registerColorThemeSync(){const e=o.window.onDidChangeActiveColorTheme(e=>{const t=this.mapColorThemeKind(e.kind);try{this.panel.webview.postMessage({command:"color_theme_changed",themeKind:t})}catch(e){T.error("Failed to notify webview about color theme change",e)}});this.disposables.push(e)}createMenuconfigHtml(e,t,i,s){const n=this.getNonce(),r=t.replace(/"/g,"&quot;"),o=i.replace(/"/g,"&quot;");return`<!DOCTYPE html>\n        <html lang="en">\n        <head>\n            <meta charset="UTF-8">\n            <meta name="viewport" content="width=device-width, initial-scale=1.0">\n            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${n}' 'unsafe-eval'; font-src ${this.panel.webview.cspSource}; img-src ${this.panel.webview.cspSource} https: data:; connect-src ${this.panel.webview.cspSource};">\n            <title>IMDE GUI Config</title>\n            <style>\n              body {\n                margin: 0;\n                padding: 0;\n                width: 100%;\n                height: 100vh;\n                overflow: hidden;\n              }\n              #menuconfig {\n                width: 100%;\n                height: 100%;\n              }\n            </style>\n            </head>\n            <body>\n              <div id="menuconfig">Loading...</div>\n              <script nonce="${n}">window.__KCONFIG_THEME__ = "${r}";window.__KCONFIG_VSCODE_COLOR_THEME__ = "${o}";<\/script>\n              <script nonce="${n}" src="${e}"><\/script>\n            </body>\n        </html>`}getNonce(){let e="";for(let t=0;t<32;t++)e+="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(62*Math.random()));return e}}class vs{static GCC_ERROR=/^(.+?):(\d+):(\d+):\s+(fatal |)(error|warning):\s+(.+)$/;static GCC_NOTE=/^(.+?):(\d+):(\d+):\s+note:\s+(.+)$/;static CMAKE_ERROR=/^\s*CMake (Error|Warning) at (.+?):(\d+)/;static NINJA_ERROR=/^FAILED:\s+(.+)$/;static LD_ERROR=/^(.+?):(\d+):\s+(error|warning):\s+(.+)$/;static PYTHON_ERROR=/^\s*File\s+"(.+?)",\s+line\s+(\d+)/;static PYTHON_EXC=/^(\w+(?:Error|Exception|Warning)):\s*(.+)$/;static GENERIC_ERROR=/^\s*(?:\[ERROR\]|ERROR:)\s+(.+)$/;static CC1_ERROR=/^(cc1(?:\.exe)?):\s+(fatal error|error):\s+(.+)$/i;static TOOL_FATAL=/^(.+?):\s+fatal error:\s*(.+)$/i;static SHELL_ERROR=/^(.+?):\s+(command not found|No such file|Permission denied|EACCES|ENOENT)/i;static MAKE_ERROR=/^\*\*\*\s+\[(.+?)\]\s+Error\s+\d+/;static COLON_ERROR=/^(.+?):(\d+):\s+(error|fatal):\s*(.+)$/i;static NINJA_STOP=/^ninja:\s+build\s+stopped/;static LINE_LIMIT=500;static stripAnsi(e){return e.replace(/\x1b\[[0-9;]*m/g,"")}static SYMBOL_PREFIX=/^[\s\u{2700}-\u{27BF}\u{2600}-\u{26FF}\u{2000}-\u{206F}\u{0080}-\u{00FF}●◆★▪▸-]+/u;static parse(e,t){const i=vs.stripAnsi(e).split("\n").slice(0,vs.LINE_LIMIT),s=[];for(const e of i){let i=e.trim();if(!i)continue;if(i=i.replace(vs.SYMBOL_PREFIX,"").trim(),!i)continue;let n=vs.GCC_ERROR.exec(i);if(n)s.push({file:vs.resolvePath(n[1],t),line:parseInt(n[2],10)-1,col:parseInt(n[3],10)-1,severity:"error"===n[5]||n[4].includes("fatal")?o.DiagnosticSeverity.Error:o.DiagnosticSeverity.Warning,message:n[6].trim(),raw:i});else{if(n=vs.CC1_ERROR.exec(i),n){const e=n[3],r=e.match(/^([A-Za-z]:[^\s:]+|\/[^\s:]+)/);s.push({file:r?vs.resolvePath(r[1],t):"",line:0,col:0,severity:o.DiagnosticSeverity.Error,message:e,raw:i});continue}n=vs.TOOL_FATAL.exec(i),n&&"ninja"!==n[1]?s.push({file:"",line:0,col:0,severity:o.DiagnosticSeverity.Error,message:n[2].trim(),raw:i}):(n=vs.PYTHON_ERROR.exec(i),n?s.push({file:vs.resolvePath(n[1],t),line:parseInt(n[2],10)-1,col:0,severity:o.DiagnosticSeverity.Error,message:i,raw:i}):(n=vs.CMAKE_ERROR.exec(i),n?s.push({file:vs.resolvePath(n[2],t),line:parseInt(n[3],10)-1,col:0,severity:"Error"===n[1]?o.DiagnosticSeverity.Error:o.DiagnosticSeverity.Warning,message:i,raw:i}):(n=vs.COLON_ERROR.exec(i),!n||i.match(/\.o:\d+:/)?vs.MAKE_ERROR.test(i)||vs.NINJA_STOP.test(i)||vs.NINJA_ERROR.test(i)?s.push({file:"",line:0,col:0,severity:o.DiagnosticSeverity.Error,message:i,raw:i}):(n=vs.PYTHON_EXC.exec(i),!n||i.includes("build succeeded")||i.includes("removed")?(n=vs.SHELL_ERROR.exec(i),n?s.push({file:"",line:0,col:0,severity:o.DiagnosticSeverity.Error,message:i,raw:i}):(n=vs.GENERIC_ERROR.exec(i),n&&s.push({file:"",line:0,col:0,severity:o.DiagnosticSeverity.Error,message:n[1],raw:i}))):s.push({file:"",line:0,col:0,severity:n[1].includes("Warning")?o.DiagnosticSeverity.Warning:o.DiagnosticSeverity.Error,message:`${n[1]}: ${n[2]}`,raw:i})):s.push({file:vs.resolvePath(n[1],t),line:parseInt(n[2],10)-1,col:0,severity:o.DiagnosticSeverity.Error,message:n[4].trim(),raw:i}))))}}return s}static resolvePath(e,t){if(e.startsWith("/")||/^[A-Za-z]:[\\/]/.test(e))return e;const{resolve:i}=n(928);return i(t,e)}}class bs{collection;workspaceRoot;constructor(e){this.workspaceRoot=e,this.collection=o.languages.createDiagnosticCollection("imde-build")}dispose(){this.collection.dispose()}clear(){this.collection.clear()}report(e){const t=vs.parse(e,this.workspaceRoot),i=new Map;for(const e of t){const t=new o.Diagnostic(new o.Range(e.line,e.col,e.line,e.col+1),e.message,e.severity);t.source="IMDE Build";const s=i.get(e.file)||[];s.push(t),i.set(e.file,s)}this.collection.clear();for(const[e,t]of i)this.collection.set(o.Uri.file(e),t);return t.length}}const Ss=new Set([".vectors",".start",".text",".rodata",".srodata",".init",".fini",".preinit_array",".init_array",".fini_array",".eh_frame",".ARM.exidx"]),Cs=new Set([".data",".sdata",".bss",".sbss",".noinit",".heap",".stack"]),Es=new Set([".comment",".note",".debug_info",".debug_abbrev",".debug_loclists",".debug_aranges",".debug_rnglists",".debug_line",".debug_str",".debug_line_str",".debug_frame",".riscv.attributes",".stab",".stabstr"]),xs=new Set([".user_heap",".user_stack",".irq_stack",".got",".rela.dyn"]);function Ms(e){return Es.has(e)||e.startsWith(".debug_")}function Ts(e){return xs.has(e)}function Os(e){return parseInt(e.replace(/^0x/i,""),16)}function ks(e){return"0x"+e.toString(16)}function Rs(e){return e.includes(".obj")||e.includes(".o")||e.endsWith(")")}function Is(e){if(e.match(/[\\/]([^\\/]+)\.c\.obj$/i)){const t=e.split(/[\\/]/),i=t.findIndex(e=>"code"===e);if(i>=0&&i+2<t.length)return`${t[i+1]}/${t[t.length-1].replace(/\.c\.obj$/i,"")}`;const s=t[t.length-1].replace(/\.c\.obj$/i,""),n=t.length>1?t[t.length-2]:"";return n?`${n}/${s}`:s}const t=e.match(/[\\/]([^\\/]+)\.[Ss]\.obj$/i);if(t){const i=e.split(/[\\/]/),s=i.findIndex(e=>"code"===e);if(s>=0&&s+2<i.length)return`${i[s+1]}/${t[1]}`;const n=t[1],r=i.length>1?i[i.length-2]:"";return r?`${r}/${n}`:n}const i=e.match(/([^\\/]+)\.a\([^)]*[-_]([^\\/]+)\.o\)$/i);if(i)return`${i[1].replace(/^lib/,"")}/${i[2]}`;const s=e.match(/[\\/]([^\\/]+)\.o$/i);if(s)return s[1];const n=e.split(/[\\/]/);return n[n.length-1].replace(/\.(o|obj|a)$/i,"")}function Ps(e){const t=e.match(/CMakeFiles[\\/][^\\/]+\.dir[\\/](.+)\.(?:c|s|S|cpp|cc)\.obj$/i);if(t)return t[1].replace(/\\/g,"/")+".c";const i=e.match(/CMakeFiles[\\/][^\\/]+\.dir[\\/](.+)\.(s|S)\.obj$/i);return i?i[1].replace(/\\/g,"/")+"."+i[2]:(e.includes(".a("),"")}function _s(e){const t=e.split(/[\\/]/),i=t.findIndex(e=>"code"===e);if(i>=0){const e=t.slice(i);return e.length>1?(e.pop(),e.join("/")):e.join("/")}const s=t.findIndex(e=>"generated"===e||"third_party"===e);if(s>=0){const e=t.slice(s);return e.length>1?(e.pop(),e.join("/")):e.join("/")}const n=e.match(/lib([^\\/]+)\.a\(/);return n?`lib/${n[1]}`:t.length>1?t[t.length-2]:""}function As(e,t,i,s){let n=e.get(i);n||(n={path:i,name:Is(i),module:_s(i),sections:{},totalSize:0,sourceFile:Ps(i)},e.set(i,n)),n.sections[t]=(n.sections[t]||0)+s,n.totalSize+=s}class $s{static currentPanel;panel;_disposed=!1;static createOrShow(e,t,i,s){const n=o.window.activeTextEditor?o.window.activeTextEditor.viewColumn:void 0,r=t.split(/[\\/]/).pop()||"Map View";if($s.currentPanel&&!$s.currentPanel._disposed)return $s.currentPanel.panel.reveal(n),void $s.currentPanel.update(t,i,s);$s.currentPanel=new $s(e,n||o.ViewColumn.One,r,t,i,s)}constructor(e,t,i,s,n,r){this.panel=o.window.createWebviewPanel("imdeMapView",i,t,{enableScripts:!0,retainContextWhenHidden:!0}),this.panel.webview.html=this.getHtml(s,n,r),this.panel.onDidDispose(()=>{this._disposed=!0,$s.currentPanel=void 0})}update(e,t,i){this.panel.webview.html=this.getHtml(e,t,i)}toPanelData(e,t){const i=e.moduleTree||[],s=(e.sections||[]).map(e=>({name:e.name,size:e.size,addressRange:e.addressRange}));return Array.isArray(i)&&0!==s.length||console.warn("[MapView] Empty or invalid moduleTree/sections from parseMapFile"),{sections:s,moduleTree:i,romUsed:e.romUsed||0,ramUsed:e.ramUsed||0,objectCount:e.objects?.length||0,projDir:t}}getHtml(e,t,i){const s=this.toPanelData(t,i||""),n=JSON.stringify(s).replace(/</g,"\\x3c"),r=o.window.activeColorTheme.kind===o.ColorThemeKind.Dark,a=r?"#808080":"#888888";return`<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>Map View</title>\n<style>${l={bg:r?"#1e1e1e":"#ffffff",fg:r?"#cccccc":"#333333",border:r?"#3c3c3c":"#e0e0e0",accent:r?"#4ec9b0":"#007acc",cardBg:r?"#252526":"#f8f8f8",muted:a},h=!!r,`\n*{margin:0;padding:0;box-sizing:border-box}\nbody{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:${l.bg};color:${l.fg};padding:20px;overflow:hidden;height:100vh;display:flex;flex-direction:column}\n.header{margin-bottom:16px;flex-shrink:0}\n.header h1{font-size:20px;font-weight:600;margin-bottom:4px;color:${l.accent};letter-spacing:-.3px}\n.header .path{font-size:11px;color:${l.muted};margin-bottom:12px;word-break:break-all;font-family:monospace}\n.summary{display:flex;gap:12px;flex-wrap:wrap}\n.summary-card{background:${l.cardBg};border:1px solid ${l.border};border-radius:8px;padding:10px 16px;min-width:100px}\n.summary-card .label{font-size:10px;color:${l.muted};text-transform:uppercase;letter-spacing:.8px;font-weight:500}\n.summary-card .value{font-size:20px;font-weight:700;margin-top:2px;color:${l.fg}}\n.controls{display:flex;gap:10px;margin-bottom:12px;flex-shrink:0;align-items:center;flex-wrap:wrap}\n.btn{background:${l.accent};color:${h?"#1e1e1e":"#fff"};border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;transition:opacity .15s}\n.btn:hover{opacity:.85}\n.btn:disabled{opacity:.3;cursor:default}\n.btn.secondary{background:${h?"#3c3c3c":"#e8e8e8"};color:${l.fg}}\n.breadcrumb{font-size:13px;color:${l.accent};cursor:pointer;flex:1;font-weight:500;user-select:none}\n.breadcrumb span{padding:2px 4px;border-radius:4px;transition:background .15s}\n.breadcrumb span:hover{background:${h?"#2a2d2e":"#eaeaea"};text-decoration:none}\n.breadcrumb .sep{color:${l.muted};margin:0 4px;font-weight:400}\n.view-toggle{display:flex;gap:0;border-radius:6px;overflow:hidden;border:1px solid ${l.border}}\n.view-toggle button{background:${l.cardBg};color:${l.fg};border:none;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:500;transition:all .15s}\n.view-toggle button.active{background:${l.accent};color:${h?"#1e1e1e":"#fff"}}\n.search-box{background:${l.cardBg};border:1px solid ${l.border};border-radius:6px;padding:5px 10px;font-size:12px;color:${l.fg};width:160px;outline:none}\n.search-box:focus{border-color:${l.accent}}\n.search-box::placeholder{color:${l.muted}}\n.treemap-wrap{flex:1;border:1px solid ${l.border};border-radius:10px;overflow:hidden;position:relative;min-height:200px;background:${l.cardBg}}\n.treemap-node{position:absolute;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;border-radius:4px;padding:4px 6px;opacity:0;animation:nodeIn .25s ease forwards;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.08)}\n@keyframes nodeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}\n.treemap-node:hover{filter:brightness(1.12);z-index:10;transform:scale(1.02);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.1),0 2px 8px rgba(0,0,0,.15)}\n.treemap-label{font-size:13px;font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}\n.treemap-size{font-size:12px;font-weight:600;margin-top:2px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}\n.treemap-pct{font-size:11px;font-weight:500;margin-top:2px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}\n.tooltip{position:fixed;background:${h?"#252526":"#fff"};border:1px solid ${l.border};border-radius:8px;padding:10px 14px;font-size:12px;pointer-events:none;z-index:1000;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:340px;display:none;line-height:1.5}\n.tooltip .tt-title{font-weight:700;margin-bottom:6px;font-size:13px}\n.tooltip .tt-row{display:flex;justify-content:space-between;gap:24px}\n.tooltip .tt-key{color:${l.muted}}\n.tooltip .tt-val{font-weight:600}\n.tooltip .tt-src{font-size:10px;margin:2px 0}\n.tooltip .tt-src a{text-decoration:none}\n.legend{display:flex;gap:14px;margin-top:10px;font-size:11px;flex-shrink:0;flex-wrap:wrap}\n.legend-item{display:flex;align-items:center;gap:5px}\n.legend-color{width:10px;height:10px;border-radius:3px}\n.section-list{display:none;flex:1;overflow:auto;padding:8px}\n.section-list.active{display:block}\n.section-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:6px;font-size:14px;transition:background .1s}\n.section-row:hover{background:${h?"#2a2d2e":"#f0f0f0"}}\n.section-row .sec-name{font-weight:500;font-family:monospace;font-size:14px}\n.section-row .sec-size{font-weight:600;font-size:14px}\n.section-bar-bg{height:6px;background:${h?"#3c3c3c":"#e0e0e0"};border-radius:3px;margin:2px 14px 10px;overflow:hidden}\n.section-bar{height:100%;border-radius:3px;transition:width .4s ease}\n.error-msg{color:#d16969;font-size:13px;padding:12px;display:none}\n.ctx-menu{position:fixed;background:${h?"#252526":"#fff"};border:1px solid ${h?"#3c3c3c":"#e0e0e0"};border-radius:6px;padding:4px 0;z-index:2000;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:140px}\n.ctx-item{padding:6px 12px;font-size:12px;cursor:pointer;color:${h?"#cccccc":"#333333"}}\n.ctx-item:hover{background:${h?"#094771":"#0066b8"};color:#fff}\n`}</style>\n</head>\n<body>\n<div class="header">\n  <h1>Memory Map</h1>\n  <div class="path">${this.escapeHtml(e)}</div>\n  <div class="summary" id="summary"></div>\n</div>\n<div class="controls">\n  <div class="breadcrumb" id="breadcrumb"></div>\n  <button class="btn secondary" id="topBtn" disabled title="Back to top level">↻</button>\n  <button class="btn secondary" id="backBtn" disabled>Back</button>\n  <input class="search-box" id="searchBox" type="text" placeholder="Search modules...">\n  <div class="view-toggle">\n    <button class="active" data-view="treemap">Treemap</button>\n    <button data-view="sections">Sections</button>\n  </div>\n</div>\n<div class="treemap-wrap" id="treemap"></div>\n<div class="section-list" id="sectionList"></div>\n<div class="legend" id="legend"></div>\n<div class="tooltip" id="tooltip"></div>\n<div class="ctx-menu" id="ctxMenu" style="display:none"><div class="ctx-item" onclick="ctxCopyName()">📋 Copy Name</div><div class="ctx-item" onclick="ctxCopyPath()">📁 Copy Path</div><div class="ctx-item" onclick="ctxRevealSource()">📄 Reveal Source</div></div>\n<div class="error-msg" id="errmsg"></div>\n\n<script>\n(function() {\n  // --- Data ---\n  var DATA = ${n};\n  var PAL = ["#5B9DA5","#E88462","#7BA64E","#C978A5","#D4A74A","#6B97CE","#8EAF6B","#CC768A","#5EA391","#C58A4E","#7990C4","#AA7A5E","#63A87C","#B87594","#8E8CC4","#D49253","#5F9DBF","#9E7DBF","#BFA560","#698DA8"];\n\n  // --- State ---\n  var viewStack = [{ name: "root", children: DATA.moduleTree || [] }];\n  var currentView = "treemap";\n  var searchQuery = "";\n\n  // --- Helpers ---\n  function colorFor(s, idx) {\n    var h = 0;\n    for (var j = 0; j < s.length; j++) { h = s.charCodeAt(j) + ((h << 5) - h); }\n    return PAL[Math.abs(h + idx) % PAL.length];\n  }\n  function fmt(b) {\n    if (b >= 1048576) return (b / 1048576).toFixed(2) + " MB";\n    if (b >= 1024) return (b / 1024).toFixed(1) + " KB";\n    return b + " B";\n  }\n  function pct(v, t) { return t <= 0 ? "0%" : ((v / t) * 100).toFixed(1) + "%"; }\n  function esc(t) { var d = document.createElement("div"); d.textContent = "" + t; return d.innerHTML; }\n\n  // --- Render summary (always global) ---\n  function renderSummary() {\n    var r = DATA.romUsed || 0;\n    var m = DATA.ramUsed || 0;\n    var t = r + m;\n    var html = "";\n    html += '<div class="summary-card"><div class="label">Total</div><div class="value">' + fmt(t) + '</div></div>';\n    html += '<div class="summary-card"><div class="label">ROM (Flash)</div><div class="value">' + fmt(r) + '</div></div>';\n    html += '<div class="summary-card"><div class="label">RAM</div><div class="value">' + fmt(m) + '</div></div>';\n    html += '<div class="summary-card"><div class="label">Modules</div><div class="value">' + (DATA.objectCount || 0) + '</div></div>';\n    document.getElementById("summary").innerHTML = html;\n  }\n\n  // --- Breadcrumb ---\n  function renderBreadcrumb() {\n    var el = document.getElementById("breadcrumb");\n    var parts = [];\n    for (var i = 0; i < viewStack.length; i++) {\n      var label = viewStack[i].name === "root" ? "All Modules" : viewStack[i].name;\n      parts.push('<span onclick="window._navTo(' + i + ')">' + esc(label) + '</span>');\n    }\n    el.innerHTML = parts.join('<span class="sep">/</span>');\n    document.getElementById("backBtn").disabled = viewStack.length <= 1;\n    document.getElementById("topBtn").disabled = viewStack.length <= 1;\n  }\n\n  window._navTo = function(idx) {\n    viewStack = viewStack.slice(0, idx + 1);\n    searchQuery = "";\n    document.getElementById("searchBox").value = "";\n    renderSummary();\n    renderBreadcrumb();\n    renderTreemap();\n  };\n\n  document.getElementById("backBtn").onclick = function() {\n    if (viewStack.length > 1) { viewStack.pop(); renderBreadcrumb(); renderTreemap(); }\n  };\n  document.getElementById("topBtn").onclick = function() {\n    viewStack = [{ name: "root", children: DATA.moduleTree || [] }];\n    searchQuery = ""; document.getElementById("searchBox").value = "";\n    renderSummary(); renderBreadcrumb(); renderTreemap();\n  };\n\n  // --- Search ---\n  document.getElementById("searchBox").addEventListener("input", function(e) {\n    searchQuery = e.target.value.trim().toLowerCase();\n    renderBreadcrumb();\n    renderTreemap();\n  });\n\n  // --- Get nodes at current tree depth ---\n  function getCurrentNodes() {\n    var nodes = DATA.moduleTree || [];\n    for (var i = 1; i < viewStack.length; i++) {\n      var target = viewStack[i];\n      var found = null;\n      for (var j = 0; j < nodes.length; j++) {\n        var n = nodes[j];\n        if (n.fullPath === target.fullPath || n.name === target.name) {\n          found = n.children || [];\n          break;\n        }\n      }\n      if (found === null) { return []; }\n      nodes = found;\n    }\n    // Global search: walk the ENTIRE subtree, collect matching nodes with path labels\n    if (searchQuery) {\n      var results = [];\n      function walk(list, prefix) {\n        for (var i = 0; i < list.length; i++) {\n          var n = list[i];\n          var curPath = prefix ? prefix + "/" + n.name : n.name;\n          if (n.name.toLowerCase().indexOf(searchQuery) >= 0) {\n            results.push({ name: curPath, size: n.size, romSize: n.romSize, ramSize: n.ramSize, children: n.children, fullPath: n.fullPath });\n          }\n          if (n.children && n.children.length > 0) {\n            walk(n.children, curPath);\n          }\n        }\n      }\n      walk(nodes, "");\n      return results;\n    }\n    return nodes;\n  }\n\n  // --- Squarified Treemap ---\n  function layoutTreemap(list, x, y, w, h) {\n    if (!list.length || w <= 0 || h <= 0) return [];\n    var total = 0;\n    for (var i = 0; i < list.length; i++) { total += list[i].size || 0; }\n    if (total <= 0) return [];\n\n    var res = [];\n    var row = [], rowSum = 0;\n\n    function worstRatio(l, s, area) {\n      var mn = Infinity, mx = 0, n = 0;\n      for (var k = 0; k < l.length; k++) {\n        var sz = l[k].size || 0;\n        if (sz > 0) { if (sz < mn) mn = sz; if (sz > mx) mx = sz; n++; }\n      }\n      if (n === 0 || area <= 0) return Infinity;\n      return Math.max((s * s * mx) / (n * n * area), (n * n * area) / (s * s * mn));\n    }\n\n    function flush(aw, ah, aa) {\n      if (!row.length) return;\n      var rowDim = aa <= 0 ? 0 : (rowSum / total) * aa / (aw >= ah ? aw : ah);\n      var off = 0;\n      for (var k = 0; k < row.length; k++) {\n        var ratio = (row[k].size || 0) / rowSum;\n        if (aw >= ah) {\n          res.push({ node: row[k], rect: { x: x + off, y: y, w: ratio * aw, h: rowDim } });\n          off += ratio * aw;\n        } else {\n          res.push({ node: row[k], rect: { x: x, y: y + off, w: rowDim, h: ratio * ah } });\n          off += ratio * ah;\n        }\n      }\n      if (aw >= ah) { y += rowDim; h -= rowDim; } else { x += rowDim; w -= rowDim; }\n      row = []; rowSum = 0;\n    }\n\n    for (var i = 0; i < list.length; i++) {\n      var sz = list[i].size || 0;\n      if (sz <= 0) continue;\n      var area = w * h;\n      if (row.length === 0) {\n        row.push(list[i]); rowSum += sz;\n      } else {\n        var pv = worstRatio(row, rowSum, area);\n        var nx = worstRatio(row.concat([list[i]]), rowSum + sz, area);\n        if (nx <= pv) {\n          row.push(list[i]); rowSum += sz;\n        } else {\n          flush(w, h, area);\n          row.push(list[i]); rowSum += sz;\n        }\n      }\n    }\n    flush(w, h, w * h);\n    return res;\n  }\n\n  // --- Treemap render ---\n  function renderTreemap() {\n    var wrap = document.getElementById("treemap");\n    wrap.innerHTML = "";\n    if (currentView !== "treemap") return;\n\n    var nodes = getCurrentNodes();\n    // Sort by size desc\n    nodes.sort(function(a, b) { return (b.size || 0) - (a.size || 0); });\n\n    var total = 0;\n    for (var i = 0; i < nodes.length; i++) { total += nodes[i].size || 0; }\n\n    // Filter out tiny nodes only if there are many\n    if (nodes.length > 10) {\n      nodes = nodes.filter(function(n) { return (n.size || 0) / total > 0.003; });\n    }\n\n    if (!nodes.length || total <= 0) {\n      wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:' + "${a}" + ';font-size:14px;">' +\n        (searchQuery ? "No matching modules" : "No data") + '</div>';\n      document.getElementById("legend").innerHTML = "";\n      return;\n    }\n\n    var cw = wrap.clientWidth;\n    var ch = wrap.clientHeight;\n    var pad = 3;\n    var layout = layoutTreemap(nodes, pad, pad, cw - pad * 2, ch - pad * 2);\n\n    var frag = document.createDocumentFragment();\n    for (var i = 0; i < layout.length; i++) {\n      var item = layout[i], node = item.node, rect = item.rect;\n      var el = document.createElement("div");\n      el.className = "treemap-node";\n      el.style.animationDelay = (i * 0.02) + "s";\n\n      var color = colorFor(node.name || "", i);\n      el.style.left = Math.round(rect.x) + "px";\n      el.style.top = Math.round(rect.y) + "px";\n      el.style.width = Math.max(1, Math.round(rect.w)) + "px";\n      el.style.height = Math.max(1, Math.round(rect.h)) + "px";\n      el.style.background = color;\n      el.style.borderColor = "rgba(255,255,255,.08)";\n\n      var sz = node.size || 0;\n      var perc = total > 0 ? ((sz / total) * 100).toFixed(1) : "0";\n      var showLabel = rect.w > 40 && rect.h > 22;\n      var showSize = rect.w > 48 && rect.h > 36;\n      var showPct = rect.w > 48 && rect.h > 50;\n\n      if (showLabel) {\n        var inner = '<div class="treemap-label">' + esc(node.name) + '</div>';\n        if (showSize) inner += '<div class="treemap-size">' + fmt(sz) + '</div>';\n        if (showPct) inner += '<div class="treemap-pct">' + perc + '%</div>';\n        el.innerHTML = inner;\n      }\n\n      // Click to drill down\n      if (node.children && node.children.length > 0) {\n        (function(n) {\n          el.addEventListener("click", function() {\n            if (searchQuery) {\n              // Search active: go to root, clear search\n              viewStack = [{ name: "root", children: DATA.moduleTree || [] }];\n              searchQuery = "";\n              document.getElementById("searchBox").value = "";\n            } else {\n              viewStack.push(n);\n            }\n            renderSummary();\n            renderBreadcrumb();\n            renderTreemap();\n          });\n        })(node);\n      }\n\n      // Right-click context menu\n      (function(n) {\n        el.addEventListener("contextmenu", function(e) {\n          e.preventDefault();\n          hideTooltip();\n          var menu = document.getElementById("ctxMenu");\n          menu.style.display = "block";\n          menu.style.left = e.clientX + "px";\n          menu.style.top = e.clientY + "px";\n          menu._node = n;\n        });\n      })(node);\n\n      // Tooltip\n      (function(n, c) {\n        el.addEventListener("mouseenter", function(e) { showTooltip(e, n, c); });\n      })(node, color);\n      el.addEventListener("mouseleave", hideTooltip);\n      el.addEventListener("mousemove", moveTooltip);\n\n      frag.appendChild(el);\n    }\n    wrap.appendChild(frag);\n\n    // Legend\n    renderLegend(nodes, total);\n  }\n\n  function renderLegend(nodes, total) {\n    var top = nodes.slice(0, 10);\n    var html = "";\n    for (var i = 0; i < top.length; i++) {\n      var c = colorFor(top[i].name || "", i);\n      html += '<div class="legend-item"><div class="legend-color" style="background:' + c + '"></div><span>' +\n        esc(top[i].name) + ' <b>' + pct(top[i].size || 0, total) + '</b></span></div>';\n    }\n    document.getElementById("legend").innerHTML = html;\n  }\n\n  // --- Section list ---\n  function renderSectionList() {\n    var el = document.getElementById("sectionList");\n    var secs = (DATA.sections || []).slice().sort(function(a, b) { return (b.size || 0) - (a.size || 0); });\n    var maxSz = 1;\n    for (var i = 0; i < secs.length; i++) { if (secs[i].size > maxSz) maxSz = secs[i].size; }\n    var html = "";\n    for (var i = 0; i < secs.length; i++) {\n      var s = secs[i];\n      var barPct = ((s.size / maxSz) * 100).toFixed(1);\n      var color = PAL[i % PAL.length];\n      html += '<div class="section-row"><span class="sec-name" title="' + esc(s.addressRange||'') + '">' + esc(s.name) +\n        '</span><span class="sec-size" style="color:' + color + '">' + fmt(s.size) +\n        (s.addressRange ? ' <span style="font-size:10px;color:' + color + '">' + s.addressRange + '</span>' : '') +\n        '</span></div>' +\n        '<div class="section-bar-bg"><div class="section-bar" style="width:' + barPct + '%;background:' + color + '"></div></div>';\n    }\n    el.innerHTML = html;\n  }\n\n  // --- Tooltip ---\n  var tooltip = document.getElementById("tooltip");\n  function showTooltip(e, node, color) {\n    var rom = node.romSize || 0, ram = node.ramSize || 0;\n    var html = '<div class="tt-title" style="color:' + color + '">' + esc(node.name) + '</div>' +\n      '<div class="tt-row"><span class="tt-key">Total</span><span class="tt-val">' + fmt(node.size || 0) + '</span></div>';\n    if (rom > 0) html += '<div class="tt-row"><span class="tt-key">ROM</span><span class="tt-val">' + fmt(rom) + '</span></div>';\n    if (ram > 0) html += '<div class="tt-row"><span class="tt-key">RAM</span><span class="tt-val">' + fmt(ram) + '</span></div>';\n    if (node.children && node.children.length) {\n      html += '<div class="tt-row"><span class="tt-key">Children</span><span class="tt-val">' + node.children.length + '</span></div>';\n    }\n    if (node.sourceFiles && node.sourceFiles.length > 0) {\n      html += '<div style="margin-top:6px;border-top:1px solid ' + (node.sourceFiles.length > 3 ? ';max-height:80px;overflow-y:auto"' : '"') + '>';\n      for (var si = 0; si < node.sourceFiles.length && si < 5; si++) {\n        var sf = node.sourceFiles[si];\n        var full = (DATA.projDir ? DATA.projDir.replace(/\\\\/g, '/') + '/' : '') + sf;\n        html += '<div class="tt-src" style="margin:2px 0"><a href="command:imde.openFile?' + encodeURIComponent(JSON.stringify([full, sf])) + '">📄 ' + esc(sf) + '</a></div>';\n      }\n      if (node.sourceFiles.length > 5) html += '<div style="font-size:10px;color:${a}">+ ' + (node.sourceFiles.length - 5) + ' more</div>';\n      html += '</div>';\n    }\n    tooltip.innerHTML = html;\n    tooltip.style.display = "block";\n    moveTooltip(e);\n  }\n  function hideTooltip() { tooltip.style.display = "none"; }\n  function moveTooltip(e) {\n    var rect = tooltip.getBoundingClientRect();\n    var left = e.clientX + 14, top = e.clientY + 14;\n    if (left + rect.width > window.innerWidth) left = e.clientX - rect.width - 8;\n    if (top + rect.height > window.innerHeight) top = e.clientY - rect.height - 8;\n    tooltip.style.left = left + "px";\n    tooltip.style.top = top + "px";\n  }\n\n  // --- View toggle ---\n  var toggleBtns = document.querySelectorAll(".view-toggle button");\n  for (var i = 0; i < toggleBtns.length; i++) {\n    toggleBtns[i].addEventListener("click", function() {\n      for (var j = 0; j < toggleBtns.length; j++) { toggleBtns[j].classList.remove("active"); }\n      this.classList.add("active");\n      currentView = this.dataset.view;\n      document.getElementById("treemap").style.display = currentView === "treemap" ? "block" : "none";\n      var sl = document.getElementById("sectionList");\n      if (currentView === "sections") { sl.classList.add("active"); } else { sl.classList.remove("active"); }\n      if (currentView === "treemap") renderTreemap();\n      if (currentView === "sections") renderSectionList();\n    });\n  }\n\n  // --- Context menu handlers ---\n  window.ctxCopyName = function() { var n = document.getElementById("ctxMenu")._node; if (n) { navigator.clipboard.writeText(n.name || n.fullPath || ""); } hideCtxMenu(); };\n  window.ctxCopyPath = function() { var n = document.getElementById("ctxMenu")._node; if (n) { navigator.clipboard.writeText(n.fullPath || n.name || ""); } hideCtxMenu(); };\n  window.ctxRevealSource = function() {\n    var n = document.getElementById("ctxMenu")._node;\n    if (n && n.sourceFiles && n.sourceFiles.length > 0) {\n      var sf = n.sourceFiles[0];\n      var full = (DATA.projDir ? DATA.projDir.replace(/\\\\/g, '/') + '/' : '') + sf;\n      window.location.href = "command:imde.openFile?" + encodeURIComponent(JSON.stringify([full, sf]));\n    }\n    hideCtxMenu();\n  };\n  function hideCtxMenu() { var m = document.getElementById("ctxMenu"); m.style.display = "none"; m._node = undefined; }\n  document.addEventListener("click", function(e) { if (!e.target.closest(".ctx-menu") && !e.target.closest(".treemap-node")) hideCtxMenu(); });\n  document.addEventListener("scroll", hideCtxMenu);\n\n  // --- Initial render ---\n  renderSummary();\n  renderBreadcrumb();\n  renderTreemap();\n\n  // --- Resize ---\n  var resizeTimer;\n  window.addEventListener("resize", function() {\n    clearTimeout(resizeTimer);\n    resizeTimer = setTimeout(function() { if (currentView === "treemap") renderTreemap(); }, 100);\n  });\n})();\n<\/script>\n</body>\n</html>`;var l,h}escapeHtml(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}}const Ds="imde.recentDefconfigs",Ns=5;async function Fs(e,t,i){const s=await e.captureJson("list-defconfigs");if(!s?.defconfigs?.length)return void o.window.showWarningMessage("No defconfigs found");const n=t?.workspaceState.get(Ds)||[],r=new Set(n),a=s.defconfigs.map(e=>({label:e.token,token:e.token,description:e.relativePath,detail:e.boardFamily?`Board: ${e.boardFamily}`:void 0}));a.sort((e,t)=>{const i=r.has(e.token),s=r.has(t.token);return i&&!s?-1:!i&&s?1:e.label.localeCompare(t.label)});for(const e of a)r.has(e.token)&&(e.description=`$(history) ${e.description||""}`.trim());const l=await o.window.showQuickPick(a,{placeHolder:"Select a defconfig..."});if(!l)return;const h=await e.runCommand("use-defconfig",["--reconfigure",l.token],{progressTitle:`Using ${l.token}`,streamOutput:!0});if(0===h.code&&!h.timedOut){if(t){const e=[l.token,...n.filter(e=>e!==l.token)].slice(0,Ns);await t.workspaceState.update(Ds,e)}i?.()}}const Ls=n(330),Vs=new Map;function Bs(e){T.info("IMDE extension is now active");const t=new u;e.subscriptions.push(t),u.warmupEnv();const i=new bs(t.getProjectDir());e.subscriptions.push(i),new ds(e).initialize();const s=new d(t),r=new g(t),l=new f(t);e.subscriptions.push(o.window.registerTreeDataProvider("imde.doctorView",s),o.window.registerTreeDataProvider("imde.buildView",r),o.window.registerTreeDataProvider("imde.artifactsView",l));const h=()=>{s.refresh(),r.refresh(),l.refresh()},c=async(e,s,n,r)=>{i.clear();const a=await o.window.withProgress({location:o.ProgressLocation.Window,title:n,cancellable:!1},()=>t.runCommand(e,s,{streamOutput:!0}));if(0!==a.code||a.timedOut){const s=i.report(a.stderr+"\n"+a.stdout);if(s>0){const i=await o.window.showErrorMessage(`IMDE ${e} failed with ${s} issue${s>1?"s":""}.`,"Show Problems","Show Output");return void("Show Problems"===i?o.commands.executeCommand("workbench.actions.view.problems"):"Show Output"===i&&t.showOutput())}}await async function(e,t,i){if(0===i.code&&!i.timedOut)return;const s=i.timedOut?"timed out":`failed with exit code ${i.code??"unknown"}`;"Show Output"===(o.workspace.getConfiguration("imde").get("showOutputOnError")??1?await o.window.showErrorMessage(`IMDE ${t} ${s}.`,"Show Output"):await o.window.showErrorMessage(`IMDE ${t} ${s}.`))&&e.showOutput()}(t,e,a),0!==a.code||a.timedOut||r?.()};e.subscriptions.push(o.commands.registerCommand("imde.doctor",()=>{t.runTerminal("",[],{show:!0}),p(()=>s.refresh(!0),2e3,2)}),o.commands.registerCommand("imde.build",async()=>{i.clear(),o.window.withProgress({location:o.ProgressLocation.Window,title:"IMDE Build — running…"},()=>new Promise(e=>{t.runTerminal("build",[],{show:!0});const i=setInterval(()=>{t.captureJson("artifacts").then(t=>{t?.artifacts&&Object.keys(t.artifacts).length>0&&(clearInterval(i),e())}).catch(()=>{})},2e3);setTimeout(()=>{clearInterval(i),e()},12e4)})),p(()=>{l.refresh(),r.refresh()},3e3,3)}),o.commands.registerCommand("imde.configure",()=>{i.clear(),t.runTerminal("configure",[],{show:!0}),p(()=>r.refresh(),2e3,2)}),o.commands.registerCommand("imde.menuconfig",async()=>{const e=t.getProjectDir(),i=a.join(e,"build","CMakeCache.txt");n(896).existsSync(i)||await o.window.withProgress({location:o.ProgressLocation.Notification,title:"Configuring build before menuconfig..."},async()=>{await t.runCommand("configure",[],{streamOutput:!1})}),t.runTerminal("menuconfig",[],{show:!0}),p(()=>{r.refresh(),l.refresh()},3e3,3)}),o.commands.registerCommand("imde.fullCleanBuild",()=>{i.clear(),t.runTerminal("fullclean",["--yes"],{show:!0}),setTimeout(()=>{t.runTerminal("build",[],{show:!0})},800),p(()=>{l.refresh(),r.refresh()},3e3,5)}),o.commands.registerCommand("imde.clean",()=>{i.clear(),t.runTerminal("clean",[],{show:!0}),p(()=>l.refresh(),2e3,2)}),o.commands.registerCommand("imde.fullclean",async()=>{"Delete"===await o.window.showWarningMessage("Delete the entire IMDE build directory? This cannot be undone.",{modal:!0},"Delete")&&(i.clear(),t.runTerminal("fullclean",["--yes"],{show:!0}),p(()=>{l.refresh(),r.refresh()},2e3,2))}),o.commands.registerCommand("imde.status",async()=>c("status",[],"Reading IMDE status",r.refresh.bind(r))),o.commands.registerCommand("imde.artifacts",async()=>c("artifacts",[],"Reading IMDE artifacts",l.refresh.bind(l))),o.commands.registerCommand("imde.setupToolchain",async()=>c("setup-toolchain",[],"Setting up IMDE toolchain",h)),o.commands.registerCommand("imde.selectDefconfig",()=>Fs(t,e,r.refresh.bind(r))),o.commands.registerCommand("imde.saveDefconfig",()=>async function(e){const t=await o.window.showInputBox({prompt:"Defconfig name (without _defconfig suffix) — saved to config/",placeHolder:"myboard -> config/myboard_defconfig",validateInput:e=>e.trim()?/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(e.trim())?void 0:"Use letters, numbers, underscores, or dashes":"Name is required"});t&&await e.runCommand("save-defconfig",[t.trim()],{progressTitle:`Saving ${t.trim()}_defconfig`,streamOutput:!0})}(t)),o.commands.registerCommand("imde.serialMonitor",async()=>{const e=await t.captureJson("serial-ports"),i=e?.ports||[];if(0===i.length)return void o.window.showWarningMessage("No serial ports detected. Connect a device and try again.");const s=i.map(e=>({label:e.port,description:e.description,detail:e.description?`${e.port} — ${e.description}`:e.port})),n=await o.window.showQuickPick(s,{placeHolder:"Select serial port…",matchOnDescription:!0});if(!n)return;const r=await o.window.showQuickPick(["115200","921600","460800","230400","57600","38400","19200","9600"],{placeHolder:`Baud rate for ${n.label} (default: 115200)`});r&&t.runTerminal("serial-monitor",[n.label,"--baudrate",r],{show:!0})}),o.commands.registerCommand("imde.copyPath",async e=>{const t="string"==typeof e?e:e.artifactPath;await o.env.clipboard.writeText(t),o.window.showInformationMessage("Path copied")}),o.commands.registerCommand("imde.revealFile",async e=>{const t="string"==typeof e?e:e.artifactPath;await o.commands.executeCommand("revealFileInOS",o.Uri.file(t))}),o.commands.registerCommand("imde.refresh",h),o.commands.registerCommand("imde.openFile",async e=>{const t=Array.isArray(e)?e[0]:e,i=Array.isArray(e)?e[1]:"",s=o.Uri.file(t);if(n(896).existsSync(t))await o.commands.executeCommand("vscode.open",s);else{if(i){const e=await o.window.withProgress({location:o.ProgressLocation.Window,title:"Searching source file…"},()=>o.workspace.findFiles("**/"+i.replace(/\\/g,"/"),null,1));if(e.length>0)return void await o.commands.executeCommand("vscode.open",e[0])}o.window.showWarningMessage("Source file not found: "+(i||t))}}),o.commands.registerCommand("imde.viewMap",async i=>{let s;if("string"==typeof i)s=i;else if(i?.artifactPath)s=i.artifactPath;else{const e=await t.captureJson("artifacts");if(e?.artifacts){const t=Object.entries(e.artifacts).filter(([e,t])=>e.endsWith(".map")&&t.exists).map(([e,t])=>({label:e,path:t.path}));if(1===t.length)s=t[0].path;else if(t.length>1){const e=await o.window.showQuickPick(t,{placeHolder:"Select a .map file to view"});s=e?.path}}if(!s)return void o.window.showWarningMessage("No .map artifact found. Build first?")}try{const i=await async function(e){const t=n(896).statSync(e),i=Vs.get(e);if(i&&i.mtime===t.mtimeMs)return i.data;const s=await o.workspace.fs.readFile(o.Uri.file(e)),r=function(e){const t=e.replace(/\r/g,"").split("\n");let i=0;for(let e=0;e<t.length;e++)t[e].startsWith("LOAD ")&&(i=e);const s=[],n=new Map;let r=null,o=0,a=0;const l=/^(\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)(?:\s|$)/,h=/^(\s+)(\S+)\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(.*)$/,c=/^(\s+)0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(.*)$/,u=/^(\s+)(\.\S+)\s*$/;for(let e=i;e<t.length;e++){const i=t[e];if(!i.trim())continue;if(i.includes("__ro_start = .")){const e=i.match(/0x([0-9a-fA-F]+)/);e&&(o=Os(e[0]));continue}if(i.includes("__ro_end = .")){const e=i.match(/0x([0-9a-fA-F]+)/);e&&(a=Os(e[0]));continue}const d=i.match(l);if(d&&!i.startsWith(" ")&&!i.startsWith("\t")){const e=d[1],t=Os(d[2]),i=Os(d[3]);!Ms(e)&&!Ts(e)&&i>0?(r={name:e,address:t,size:i,addressRange:ks(t)+"–"+ks(t+i)},s.push(r)):r=null;continue}if(!r)continue;if(i.includes("fill=0x"))continue;if(i.includes(" *fill* "))continue;if(i.match(u))continue;const p=i.match(h);if(p){const e=p[5].trim();if(Rs(e)){const t=Os(p[4]);t>0&&As(n,r.name,e,t)}continue}const f=i.match(c);if(f){const e=f[4].trim();if(Rs(e)){const t=Os(f[3]);t>0&&As(n,r.name,e,t)}continue}i.match(/^(\s+)0x([0-9a-fA-F]+)\s+(\S+)\s*$/)}if(o>0&&a>0&&a>o){const e=a-o-(s.find(e=>".vectors"===e.name)?.size||0)-(s.find(e=>".start"===e.name)?.size||0)-(s.find(e=>".text"===e.name)?.size||0);if(e>0){const t=s.find(e=>".text"===e.name),i=t.address+t.size;s.push({name:".rodata",address:i,size:e,addressRange:ks(i)+"–"+ks(i+e)})}}const d=Array.from(n.values()).sort((e,t)=>t.totalSize-e.totalSize),p=function(e){const t=[],i=(e,t,i)=>{let s=e.find(e=>e.name===t);return s||(s={name:t,fullPath:i,size:0,romSize:0,ramSize:0,children:[]},e.push(s)),s};for(const s of e){const e=s.module.split("/").filter(Boolean);let n=t,r="";for(let t=0;t<e.length;t++)r=r?`${r}/${e[t]}`:e[t],n=i(n,e[t],r).children}for(const i of e){const e=i.module.split("/").filter(Boolean);let s=t;for(let t=0;t<e.length;t++){const n=s.find(i=>i.name===e[t]);if(t===e.length-1){n.size+=i.totalSize;for(const[e,t]of Object.entries(i.sections))Ss.has(e)&&(n.romSize+=t),Cs.has(e)&&(n.ramSize+=t);i.sourceFile&&(n.sourceFiles||(n.sourceFiles=[]),n.sourceFiles.includes(i.sourceFile)||n.sourceFiles.push(i.sourceFile))}s=n.children}}return function e(t){let i=0;for(const s of t){const t=e(s.children);0===s.size&&t>0&&(s.size=t),i+=s.size}return i}(t),t}(d);let f=0,g=0;for(const e of s)Ss.has(e.name)&&(f+=e.size),Cs.has(e.name)&&(g+=e.size);return{sections:s,objects:d,romSize:0,ramSize:0,romUsed:f,ramUsed:g,moduleTree:p}}(Buffer.from(s).toString("utf-8"));return Vs.set(e,{mtime:t.mtimeMs,data:r}),r}(s);$s.createOrShow(e.extensionUri,s,i,t.getProjectDir())}catch(e){o.window.showErrorMessage(`Failed to parse map file: ${e.message}`)}}),o.commands.registerCommand("imde.guiConfig",async i=>{const s=i?o.workspace.getWorkspaceFolder(i):o.workspace.workspaceFolders?.[0];if(!s)return void o.window.showErrorMessage("Please open a workspace folder first.");const r=n(896),l=s.uri.fsPath,h=a.join(l,".config");if(!r.existsSync(h))return void("Select Defconfig"===await o.window.showWarningMessage("No .config found. Select a defconfig to generate one.","Select Defconfig")&&await Fs(t,e));const c=a.join(l,"build","CMakeCache.txt");r.existsSync(c)||await o.window.withProgress({location:o.ProgressLocation.Notification,title:"Build directory cleaned — re-configuring..."},async()=>{await t.runCommand("configure",[],{streamOutput:!1})});try{ws.createOrShow(e.extensionUri,s.uri,e)}catch(e){o.window.showErrorMessage(`Failed to open IMDE GUI Config: ${e.message}`)}})),s.refresh(),r.refresh();const p=(e,t=3e3,i=3)=>{let s=0;const n=()=>{e(),++s<i&&setTimeout(n,t)};setTimeout(n,t)},m=(e,t,i,s)=>{const n=o.window.createStatusBarItem(o.StatusBarAlignment.Left,s);return n.command=t,n.text=e,n.tooltip=i,n.show(),n},y=m("$(symbol-color) Map","imde.viewMap","View Memory Map",95);async function w(){try{const e=await t.captureJson("artifacts");e?.artifacts&&Object.entries(e.artifacts).some(([e,t])=>e.endsWith(".map")&&t.exists)?y.show():y.hide()}catch{y.hide()}}const v=setInterval(w,1e4);e.subscriptions.push({dispose:()=>clearInterval(v)}),setTimeout(w,2e3),e.subscriptions.push(m("$(circuit-board) IMDE","imde.doctor",`IMDE ${Ls.version}`,100),m("$(debug-rerun) Rebuild","imde.fullCleanBuild","FullClean & Build",99),m("$(play) Build","imde.build","Build",98),m("$(list-selection) Select","imde.selectDefconfig","Select Defconfig",97),m("$(settings) Config","imde.guiConfig","GUI Config",96),y,m("$(plug) Serial","imde.serialMonitor","Serial Monitor",94))}function zs(){T.info("IMDE extension is now deactivated")}module.exports=r})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/artifactsTree.ts"
+/*!******************************!*\
+  !*** ./src/artifactsTree.ts ***!
+  \******************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ArtifactTreeItem: () => (/* binding */ ArtifactTreeItem),
+/* harmony export */   ArtifactsTreeProvider: () => (/* binding */ ArtifactsTreeProvider)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+
+class ArtifactTreeItem extends vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem {
+    artifactPath;
+    constructor(label, artifactPath, exists, size) {
+        super(label);
+        this.artifactPath = artifactPath;
+        this.description = exists ? size : "not built";
+        this.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon(exists ? "file" : "circle-slash");
+        this.tooltip = artifactPath;
+        if (exists) {
+            this.command = { command: "vscode.open", title: "Open", arguments: [vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(artifactPath)] };
+            this.contextValue = label.endsWith(".map") ? "imdeMapArtifact" : "imdeArtifact";
+        }
+    }
+}
+class ArtifactsTreeProvider {
+    runner;
+    _onDidChange = new vscode__WEBPACK_IMPORTED_MODULE_0__.EventEmitter();
+    onDidChangeTreeData = this._onDidChange.event;
+    cached = [];
+    loading = false;
+    loaded = false;
+    constructor(runner) {
+        this.runner = runner;
+    }
+    refresh() {
+        if (this.loading)
+            return;
+        this.loading = true;
+        this._fetch().then(items => {
+            this.cached = items;
+        }).catch(() => {
+            this.cached = [];
+        }).finally(() => {
+            this.loaded = true;
+            this.loading = false;
+            this._onDidChange.fire();
+        });
+    }
+    getTreeItem(element) { return element; }
+    getChildren() {
+        if (!this.loaded && !this.loading)
+            this.refresh();
+        if (this.loading) {
+            const item = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("Reading artifacts...");
+            item.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("loading~spin");
+            return [item];
+        }
+        return this.cached;
+    }
+    async _fetch() {
+        const data = await this.runner.captureJson("artifacts");
+        if (!data?.artifacts) {
+            const ti = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("No artifacts available");
+            ti.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("warning");
+            ti.description = "build first";
+            ti.tooltip = "Run IMDE Build to generate artifacts.";
+            ti.command = { command: "imde.build", title: "Build" };
+            return [ti];
+        }
+        const items = Object.entries(data.artifacts).map(([key, meta]) => {
+            const exists = meta.exists;
+            const size = meta.size ? `${(meta.size / 1024).toFixed(1)} KB` : "";
+            return new ArtifactTreeItem(key, meta.path, exists, size);
+        });
+        const builtCount = items.filter((item) => item.contextValue === "imdeArtifact" || item.contextValue === "imdeMapArtifact").length;
+        if (items.length > 0 && builtCount === 0) {
+            const build = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("Artifacts are not built yet", vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+            build.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("play");
+            build.description = "run build";
+            build.command = { command: "imde.build", title: "Build" };
+            return [build, ...items];
+        }
+        return items;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/buildTree.ts"
+/*!**************************!*\
+  !*** ./src/buildTree.ts ***!
+  \**************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BuildTreeProvider: () => (/* binding */ BuildTreeProvider)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+
+class BuildTreeProvider {
+    runner;
+    _onDidChange = new vscode__WEBPACK_IMPORTED_MODULE_0__.EventEmitter();
+    onDidChangeTreeData = this._onDidChange.event;
+    constructor(runner) {
+        this.runner = runner;
+    }
+    refresh() { this._onDidChange.fire(); }
+    getTreeItem(element) { return element; }
+    async getChildren() {
+        const items = [];
+        const data = await this.runner.captureJson("status");
+        if (data) {
+            const state = data.state || "unknown";
+            const ok = state.startsWith("matched") && data.buildConfigured;
+            const statusItem = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem(`Status: ${state}`, vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+            statusItem.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon(ok ? "pass" : "warning");
+            statusItem.description = data.buildConfigured ? "configured" : "not configured";
+            statusItem.tooltip = data.buildConfigured
+                ? "Build system is configured."
+                : "Build system is not configured yet. Run Configure before building.";
+            items.push(statusItem);
+            if (data.defconfig) {
+                const defconfig = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem(`Defconfig: ${data.defconfig}`, vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+                defconfig.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("symbol-file");
+                items.push(defconfig);
+            }
+            else {
+                const defconfig = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("No defconfig selected", vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+                defconfig.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("warning");
+                defconfig.description = "select one";
+                defconfig.command = { command: "imde.selectDefconfig", title: "Select Defconfig" };
+                items.push(defconfig);
+            }
+        }
+        else {
+            const failed = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("Status unavailable", vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+            failed.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("warning");
+            failed.description = "run doctor";
+            failed.command = { command: "imde.doctor", title: "Run Doctor" };
+            items.push(failed);
+        }
+        // ---- Action buttons (command-linked tree items) ----
+        const mkBtn = (label, cmd, icon, desc) => {
+            const ti = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem(label, vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItemCollapsibleState.None);
+            ti.command = { command: cmd, title: label };
+            ti.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon(icon);
+            ti.description = desc;
+            return ti;
+        };
+        items.push(mkBtn("Build", "imde.build", "play"));
+        items.push(mkBtn("Configure", "imde.configure", "settings-gear"));
+        items.push(mkBtn("Select Defconfig", "imde.selectDefconfig", "list-selection"));
+        items.push(mkBtn("GUI Config", "imde.guiConfig", "settings"));
+        items.push(mkBtn("Pinmux", "imde.pinmux", "circuit-board"));
+        items.push(mkBtn("Save Config", "imde.saveDefconfig", "save"));
+        items.push(mkBtn("Clean", "imde.clean", "trash"));
+        items.push(mkBtn("Full Clean", "imde.fullclean", "warning"));
+        return items;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/defconfig.ts"
+/*!**************************!*\
+  !*** ./src/defconfig.ts ***!
+  \**************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   saveDefconfig: () => (/* binding */ saveDefconfig),
+/* harmony export */   selectDefconfig: () => (/* binding */ selectDefconfig)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+
+const RECENT_DEFCONFIGS_KEY = "imde.recentDefconfigs";
+const MAX_RECENT = 5;
+function showPickStep(items, placeHolder, showBack) {
+    return new Promise((resolve) => {
+        const picker = vscode__WEBPACK_IMPORTED_MODULE_0__.window.createQuickPick();
+        let settled = false;
+        const backItem = {
+            label: "← Back",
+            alwaysShow: true,
+            isBack: true,
+        };
+        picker.items = showBack ? [backItem, ...items] : items;
+        picker.placeholder = placeHolder;
+        picker.matchOnDescription = true;
+        picker.matchOnDetail = true;
+        const finish = (result) => {
+            if (settled)
+                return;
+            settled = true;
+            resolve(result);
+            picker.hide();
+        };
+        picker.onDidAccept(() => {
+            const selected = picker.selectedItems[0];
+            if (!selected)
+                return;
+            if ("isBack" in selected) {
+                finish({ action: "back" });
+            }
+            else {
+                finish({ action: "pick", item: selected });
+            }
+        });
+        picker.onDidHide(() => {
+            if (!settled) {
+                settled = true;
+                resolve({ action: "cancel" });
+            }
+            picker.dispose();
+        });
+        picker.show();
+    });
+}
+function normalizedRoot(record) {
+    return (record.sourceRoot || "").replace(/\\/g, "/").replace(/^\.\//, "");
+}
+function sourceIdentity(record) {
+    const root = normalizedRoot(record);
+    if (root === "config" && record.boardFamily) {
+        return { source: record.boardFamily, sourceKind: "chip" };
+    }
+    if (root === "test") {
+        return { source: "test", sourceKind: "test" };
+    }
+    if (root === "code/middleware" || root.endsWith("/middleware")) {
+        return { source: "middleware", sourceKind: "middleware" };
+    }
+    return { source: root.split("/").filter(Boolean).pop() || root, sourceKind: "other" };
+}
+function withoutPrefix(value, prefix) {
+    const normalized = value.replace(/\\/g, "/");
+    const expected = `${prefix}/`;
+    return normalized.startsWith(expected) ? normalized.slice(expected.length) : normalized;
+}
+function selectionArgs(record, source) {
+    const relative = record.rootRelativePath || record.token;
+    if (source === "test" && record.microchip) {
+        const config = withoutPrefix(relative, record.microchip);
+        return { args: ["--reconfigure", source, record.microchip, config], label: config };
+    }
+    if (source === "test") {
+        return { args: ["--reconfigure", record.token], label: record.token };
+    }
+    const config = record.boardFamily && normalizedRoot(record) === "config"
+        ? withoutPrefix(relative, record.boardFamily)
+        : relative;
+    return { args: ["--reconfigure", source, config], label: config };
+}
+function makeConfigItems(records, source, recent) {
+    const recentSet = new Set(recent);
+    const items = records.map((record) => {
+        const selection = selectionArgs(record, source);
+        const recentKey = record.relativePath || record.token;
+        const isRecent = recentSet.has(recentKey) || recentSet.has(record.token);
+        return {
+            label: selection.label,
+            commandArgs: selection.args,
+            recentKey,
+            legacyToken: record.token,
+            description: `${isRecent ? "$(history) " : ""}${record.relativePath || ""}`.trim(),
+            detail: [
+                record.microchip ? `Microchip: ${record.microchip}` : "",
+                record.board ? `Board: ${record.board}` : "",
+            ].filter(Boolean).join(" · ") || undefined,
+        };
+    });
+    return items.sort((left, right) => {
+        const leftRecent = recentSet.has(left.recentKey) || recentSet.has(left.legacyToken);
+        const rightRecent = recentSet.has(right.recentKey) || recentSet.has(right.legacyToken);
+        if (leftRecent !== rightRecent)
+            return leftRecent ? -1 : 1;
+        return left.label.localeCompare(right.label);
+    });
+}
+async function selectDefconfig(runner, context, after) {
+    const output = await runner.captureJson("list-defconfigs");
+    if (!output?.defconfigs?.length) {
+        vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("No defconfigs found");
+        return;
+    }
+    const recent = context?.workspaceState.get(RECENT_DEFCONFIGS_KEY) || [];
+    const sourceMap = new Map();
+    for (const record of output.defconfigs) {
+        const identity = sourceIdentity(record);
+        if (!identity.source)
+            continue;
+        const existing = sourceMap.get(identity.source);
+        if (existing) {
+            existing.records.push(record);
+            existing.description = `${existing.records.length} configs`;
+            continue;
+        }
+        sourceMap.set(identity.source, {
+            label: identity.source,
+            source: identity.source,
+            sourceKind: identity.sourceKind,
+            records: [record],
+            description: "1 config",
+            iconPath: new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon(identity.sourceKind === "chip" ? "circuit-board" : identity.sourceKind === "test" ? "beaker" : "library"),
+        });
+    }
+    const sourceOrder = {
+        chip: 0,
+        middleware: 1,
+        test: 2,
+        other: 3,
+    };
+    const sources = [...sourceMap.values()].sort((left, right) => sourceOrder[left.sourceKind] - sourceOrder[right.sourceKind] || left.label.localeCompare(right.label));
+    let pickedSource;
+    let picked;
+    while (!picked) {
+        if (!pickedSource) {
+            const sourceResult = await showPickStep(sources, "Select config source...", false);
+            if (sourceResult.action !== "pick")
+                return;
+            pickedSource = sourceResult.item;
+        }
+        let records = pickedSource.records;
+        if (pickedSource.sourceKind === "test") {
+            const chipMap = new Map();
+            for (const record of records) {
+                const chip = record.microchip || "Unclassified";
+                const grouped = chipMap.get(chip) || [];
+                grouped.push(record);
+                chipMap.set(chip, grouped);
+            }
+            const chips = [...chipMap.entries()]
+                .map(([chip, chipRecords]) => ({
+                label: chip,
+                chip,
+                records: chipRecords,
+                description: `${chipRecords.length} configs`,
+                iconPath: new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("circuit-board"),
+            }))
+                .sort((left, right) => left.label.localeCompare(right.label));
+            const chipResult = await showPickStep(chips, "Select test chip...", true);
+            if (chipResult.action === "cancel")
+                return;
+            if (chipResult.action === "back") {
+                pickedSource = undefined;
+                continue;
+            }
+            records = chipResult.item.records;
+        }
+        const configResult = await showPickStep(makeConfigItems(records, pickedSource.source, recent), `Select ${pickedSource.source} defconfig...`, true);
+        if (configResult.action === "cancel")
+            return;
+        if (configResult.action === "back") {
+            if (pickedSource.sourceKind !== "test")
+                pickedSource = undefined;
+            continue;
+        }
+        picked = configResult.item;
+    }
+    const result = await runner.runCommand("use-defconfig", picked.commandArgs, {
+        progressTitle: `Using ${picked.label}`, streamOutput: true,
+    });
+    if (result.code === 0 && !result.timedOut) {
+        if (context) {
+            const updated = [picked.recentKey, ...recent.filter((item) => item !== picked.recentKey && item !== picked.legacyToken)].slice(0, MAX_RECENT);
+            await context.workspaceState.update(RECENT_DEFCONFIGS_KEY, updated);
+        }
+        after?.();
+    }
+}
+async function saveDefconfig(runner) {
+    const name = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInputBox({
+        prompt: "Defconfig name (without _defconfig suffix) — saved to config/",
+        placeHolder: "myboard -> config/myboard_defconfig",
+        validateInput: (v) => {
+            if (!v.trim())
+                return "Name is required";
+            if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(v.trim()))
+                return "Use letters, numbers, underscores, or dashes";
+            return undefined;
+        },
+    });
+    if (!name)
+        return;
+    await runner.runCommand("save-defconfig", [name.trim()], {
+        progressTitle: `Saving ${name.trim()}_defconfig`, streamOutput: true,
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/diagnostics.ts"
+/*!****************************!*\
+  !*** ./src/diagnostics.ts ***!
+  \****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BuildErrorParser: () => (/* binding */ BuildErrorParser),
+/* harmony export */   ImdeDiagnostics: () => (/* binding */ ImdeDiagnostics)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! path */ "path");
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(path__WEBPACK_IMPORTED_MODULE_1__);
+
+
+/**
+ * Parses GCC/Ninja/CMake build output into structured diagnostics.
+ */
+class BuildErrorParser {
+    // GCC/Clang: file:line:col: error/warning/fatal error: message
+    static GCC_ERROR = /^(.+?):(\d+):(\d+):\s+(fatal |)(error|warning):\s+(.+)$/;
+    // GCC note (follows error): file:line:col: note: message
+    static GCC_NOTE = /^(.+?):(\d+):(\d+):\s+note:\s+(.+)$/;
+    // CMake: CMake Error/Warning at file:line
+    static CMAKE_ERROR = /^\s*CMake (Error|Warning) at (.+?):(\d+)/;
+    // Ninja: FAILED: target
+    static NINJA_ERROR = /^FAILED:\s+(.+)$/;
+    // Linker/file.o:line: error: message
+    static LD_ERROR = /^(.+?):(\d+):\s+(error|warning):\s+(.+)$/;
+    // Python traceback: File "path", line N, in ...
+    static PYTHON_ERROR = /^\s*File\s+"(.+?)",\s+line\s+(\d+)/;
+    // Python Exception/Error (last line of traceback)
+    static PYTHON_EXC = /^(\w+(?:Error|Exception|Warning)):\s*(.+)$/;
+    // Generic: [ERROR] or ERROR: at start
+    static GENERIC_ERROR = /^\s*(?:\[ERROR\]|ERROR:)\s+(.+)$/;
+    // Compiler driver: cc1.exe / cc1: fatal error: message
+    static CC1_ERROR = /^(cc1(?:\.exe)?):\s+(fatal error|error):\s+(.+)$/i;
+    // Tool: fatal error: file: message
+    static TOOL_FATAL = /^(.+?):\s+fatal error:\s*(.+)$/i;
+    // Shell: command not found, permission denied, etc.
+    static SHELL_ERROR = /^(.+?):\s+(command not found|No such file|Permission denied|EACCES|ENOENT)/i;
+    // Make-style: *** [target] Error N
+    static MAKE_ERROR = /^\*\*\*\s+\[(.+?)\]\s+Error\s+\d+/;
+    // Generic colon error: file:line: error
+    static COLON_ERROR = /^(.+?):(\d+):\s+(error|fatal):\s*(.+)$/i;
+    // Ninja build stop
+    static NINJA_STOP = /^ninja:\s+build\s+stopped/;
+    static LINE_LIMIT = 500;
+    static stripAnsi(text) {
+        // eslint-disable-next-line no-control-regex
+        return text.replace(/\x1b\[[0-9;]*m/g, "");
+    }
+    // Strip unicode symbols (✗ ⚠ ✘ ✔ ● etc.) that IMDE prefixes error lines with
+    static SYMBOL_PREFIX = /^[\s\u{2700}-\u{27BF}\u{2600}-\u{26FF}\u{2000}-\u{206F}\u{0080}-\u{00FF}●◆★▪▸-]+/u;
+    static parse(output, workspaceRoot) {
+        const clean = BuildErrorParser.stripAnsi(output);
+        const lines = clean.split("\n").slice(0, BuildErrorParser.LINE_LIMIT);
+        const errors = [];
+        for (const line of lines) {
+            let trimmed = line.trim();
+            if (!trimmed)
+                continue;
+            // Strip leading symbols that IMDE prefixes (✗ error, ⚠ warning, etc.)
+            trimmed = trimmed.replace(BuildErrorParser.SYMBOL_PREFIX, "").trim();
+            if (!trimmed)
+                continue;
+            // GCC/Clang: file:line:col: error/warning/fatal error: msg
+            let m = BuildErrorParser.GCC_ERROR.exec(trimmed);
+            if (m) {
+                errors.push({
+                    file: BuildErrorParser.resolvePath(m[1], workspaceRoot),
+                    line: parseInt(m[2], 10) - 1,
+                    col: parseInt(m[3], 10) - 1,
+                    severity: m[5] === "error" || m[4].includes("fatal")
+                        ? vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error : vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Warning,
+                    message: m[6].trim(), raw: trimmed,
+                });
+                continue;
+            }
+            // cc1.exe: fatal error: D:/path/to/file.c: message
+            m = BuildErrorParser.CC1_ERROR.exec(trimmed);
+            if (m) {
+                const msg = m[3];
+                // Try to extract a file path from the message
+                const fileMatch = msg.match(/^([A-Za-z]:[^\s:]+|\/[^\s:]+)/);
+                errors.push({
+                    file: fileMatch ? BuildErrorParser.resolvePath(fileMatch[1], workspaceRoot) : "",
+                    line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: msg, raw: trimmed,
+                });
+                continue;
+            }
+            // tool: fatal error: message  (e.g. riscv-gcc.exe: fatal error: ...)
+            m = BuildErrorParser.TOOL_FATAL.exec(trimmed);
+            if (m && m[1] !== "ninja") {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: m[2].trim(), raw: trimmed,
+                });
+                continue;
+            }
+            // Python: File "x.py", line N
+            m = BuildErrorParser.PYTHON_ERROR.exec(trimmed);
+            if (m) {
+                errors.push({
+                    file: BuildErrorParser.resolvePath(m[1], workspaceRoot),
+                    line: parseInt(m[2], 10) - 1, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // CMake: CMake Error/Warning at file:line
+            m = BuildErrorParser.CMAKE_ERROR.exec(trimmed);
+            if (m) {
+                errors.push({
+                    file: BuildErrorParser.resolvePath(m[2], workspaceRoot),
+                    line: parseInt(m[3], 10) - 1, col: 0,
+                    severity: m[1] === "Error" ? vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error : vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Warning,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // Colon error: file:line: error: msg (generic)
+            m = BuildErrorParser.COLON_ERROR.exec(trimmed);
+            if (m && !trimmed.match(/\.o:\d+:/) /* skip linker .o refs */) {
+                errors.push({
+                    file: BuildErrorParser.resolvePath(m[1], workspaceRoot),
+                    line: parseInt(m[2], 10) - 1, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: m[4].trim(), raw: trimmed,
+                });
+                continue;
+            }
+            // Make: *** [target] Error N
+            if (BuildErrorParser.MAKE_ERROR.test(trimmed)) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // Ninja: build stopped
+            if (BuildErrorParser.NINJA_STOP.test(trimmed)) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // Ninja: FAILED: target
+            if (BuildErrorParser.NINJA_ERROR.test(trimmed)) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // Python exception (last traceback line)
+            m = BuildErrorParser.PYTHON_EXC.exec(trimmed);
+            if (m && !trimmed.includes("build succeeded") && !trimmed.includes("removed")) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: m[1].includes("Warning") ? vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Warning : vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: `${m[1]}: ${m[2]}`, raw: trimmed,
+                });
+                continue;
+            }
+            // Shell/system errors
+            m = BuildErrorParser.SHELL_ERROR.exec(trimmed);
+            if (m) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: trimmed, raw: trimmed,
+                });
+                continue;
+            }
+            // Generic ERROR tag
+            m = BuildErrorParser.GENERIC_ERROR.exec(trimmed);
+            if (m) {
+                errors.push({
+                    file: "", line: 0, col: 0,
+                    severity: vscode__WEBPACK_IMPORTED_MODULE_0__.DiagnosticSeverity.Error,
+                    message: m[1], raw: trimmed,
+                });
+            }
+        }
+        return errors;
+    }
+    static resolvePath(filePath, root) {
+        if (filePath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(filePath)) {
+            return filePath;
+        }
+        return path__WEBPACK_IMPORTED_MODULE_1__.resolve(root, filePath);
+    }
+}
+/**
+ * Manages a DiagnosticCollection for IMDE build errors,
+ * feeding the VS Code Problems panel.
+ */
+class ImdeDiagnostics {
+    collection;
+    workspaceRoot;
+    constructor(workspaceRoot) {
+        this.workspaceRoot = workspaceRoot;
+        this.collection = vscode__WEBPACK_IMPORTED_MODULE_0__.languages.createDiagnosticCollection("imde-build");
+    }
+    dispose() {
+        this.collection.dispose();
+    }
+    /** Clear all previous diagnostics. */
+    clear() {
+        this.collection.clear();
+    }
+    /** Parse output and populate Problems panel. Returns error count. */
+    report(output) {
+        const errors = BuildErrorParser.parse(output, this.workspaceRoot);
+        const byFile = new Map();
+        for (const e of errors) {
+            const diag = new vscode__WEBPACK_IMPORTED_MODULE_0__.Diagnostic(new vscode__WEBPACK_IMPORTED_MODULE_0__.Range(e.line, e.col, e.line, e.col + 1), e.message, e.severity);
+            diag.source = "IMDE Build";
+            const list = byFile.get(e.file) || [];
+            list.push(diag);
+            byFile.set(e.file, list);
+        }
+        this.collection.clear();
+        for (const [file, diags] of byFile) {
+            this.collection.set(vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(file), diags);
+        }
+        return errors.length;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/doctorTree.ts"
+/*!***************************!*\
+  !*** ./src/doctorTree.ts ***!
+  \***************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   DoctorTreeProvider: () => (/* binding */ DoctorTreeProvider)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+
+class DoctorTreeProvider {
+    runner;
+    _onDidChange = new vscode__WEBPACK_IMPORTED_MODULE_0__.EventEmitter();
+    onDidChangeTreeData = this._onDidChange.event;
+    cached = [];
+    lastRefresh = 0;
+    refreshTimer;
+    loading = false;
+    loaded = false;
+    constructor(runner) {
+        this.runner = runner;
+    }
+    refresh(force = false) {
+        const now = Date.now();
+        if (!force && now - this.lastRefresh < 10000) {
+            // Throttled: show loading immediately, defer actual refresh
+            if (!this.refreshTimer) {
+                this.loading = true;
+                this._onDidChange.fire();
+                this.refreshTimer = setTimeout(() => {
+                    this.refreshTimer = undefined;
+                    this._doRefresh();
+                }, 10000 - (now - this.lastRefresh));
+            }
+            return;
+        }
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+            this.refreshTimer = undefined;
+        }
+        this._doRefresh();
+    }
+    _doRefresh() {
+        if (this.loading)
+            return;
+        this.loading = true;
+        this._onDidChange.fire();
+        this.lastRefresh = Date.now();
+        this._fetch().then(items => {
+            this.cached = items;
+        }).catch(() => {
+            this.cached = [this._action("Failed to run doctor", "imde.doctor", "open env")];
+        }).finally(() => {
+            this.loaded = true;
+            this.loading = false;
+            this._onDidChange.fire();
+        });
+    }
+    getTreeItem(element) { return element; }
+    getChildren() {
+        if (!this.loaded && !this.loading)
+            this._doRefresh();
+        if (this.loading) {
+            const ti = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem("Refreshing environment...");
+            ti.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("loading~spin");
+            return [ti];
+        }
+        return this.cached;
+    }
+    async _fetch() {
+        const data = await this.runner.captureJson("doctor");
+        if (!data?.checks)
+            return [this._action("Failed to run doctor", "imde.doctor", "open env")];
+        const c = data.checks;
+        const items = [];
+        // Python
+        items.push(this._check("Python", true, c.python?.version, c.python?.path));
+        // CMake
+        items.push(this._check("CMake", c.cmake?.ok || false, this._ver(c.cmake?.version), c.cmake?.path));
+        // Ninja
+        items.push(this._check("Ninja", c.ninja?.ok || false, "", c.ninja?.path));
+        // Toolchain
+        items.push(this._check("Toolchain", c.toolchain?.ok || false, c.toolchain?.installedVersion, c.toolchain?.root));
+        // Menuconfig
+        items.push(this._check("Menuconfig", c.menuconfig?.ok || false, "", c.menuconfig?.path));
+        return items;
+    }
+    _check(label, ok, detail, tooltip) {
+        const ti = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem(label);
+        ti.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon(ok ? "pass" : "error");
+        ti.description = detail || (ok ? "OK" : "FAIL");
+        ti.tooltip = tooltip || label;
+        return ti;
+    }
+    _ver(raw) {
+        if (!raw)
+            return "";
+        const parts = raw.split(" ");
+        return parts[parts.length - 1] || raw;
+    }
+    _error(msg) {
+        const ti = new vscode__WEBPACK_IMPORTED_MODULE_0__.TreeItem(msg);
+        ti.iconPath = new vscode__WEBPACK_IMPORTED_MODULE_0__.ThemeIcon("warning");
+        return ti;
+    }
+    _action(msg, command, description) {
+        const ti = this._error(msg);
+        ti.description = description;
+        ti.command = { command, title: description };
+        return ti;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/imdeRunner.ts"
+/*!***************************!*\
+  !*** ./src/imdeRunner.ts ***!
+  \***************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ImdeRunner: () => (/* binding */ ImdeRunner)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var child_process__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! child_process */ "child_process");
+/* harmony import */ var child_process__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(child_process__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! path */ "path");
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(path__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! fs */ "fs");
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(fs__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var os__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! os */ "os");
+/* harmony import */ var os__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(os__WEBPACK_IMPORTED_MODULE_4__);
+
+
+
+
+
+/** Canonical platform directory name matching IMDE Python detect_platform(). */
+function imdePlatformDir() {
+    if (process.platform === "win32")
+        return "windows";
+    if (process.platform === "linux")
+        return "linux";
+    if (process.platform === "darwin") {
+        try {
+            const cpu = os__WEBPACK_IMPORTED_MODULE_4__.cpus();
+            // Apple Silicon models report "Apple M…" in their model name
+            const isArm = cpu.length > 0 && /Apple\s+M\d/i.test(cpu[0]?.model || "");
+            return isArm ? "macos-arm64" : "macos";
+        }
+        catch {
+            return "macos";
+        }
+    }
+    return process.platform;
+}
+class ImdeRunner {
+    terminal;
+    output = vscode__WEBPACK_IMPORTED_MODULE_0__.window.createOutputChannel("IMDE");
+    _projectRoot = null;
+    _projectChecked = false;
+    terminalCommandQueue = Promise.resolve();
+    terminalEnvReady = false;
+    terminalEnvReadyPromise;
+    static loginEnvCache = null;
+    dispose() {
+        this.jsonCache.clear();
+        this.output.dispose();
+    }
+    invalidateJsonCache() {
+        this.jsonCache.clear();
+    }
+    /** Force re-detection of the IMDE project root on next access. */
+    resetProjectCheck() {
+        this._projectChecked = false;
+        this._projectRoot = null;
+    }
+    /** True when a valid IMDE project (containing imde.json) was resolved. */
+    get isValidImdeProject() {
+        this._ensureProjectChecked();
+        return this._projectRoot !== null;
+    }
+    /** The resolved IMDE project root, or an empty string when invalid. */
+    getProjectDir() {
+        this._ensureProjectChecked();
+        return this._projectRoot || "";
+    }
+    _ensureProjectChecked() {
+        if (this._projectChecked)
+            return;
+        this._projectChecked = true;
+        const cfg = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde");
+        const configured = cfg.get("projectDir")?.trim();
+        if (configured) {
+            const resolved = path__WEBPACK_IMPORTED_MODULE_2__.resolve(configured);
+            if (fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(path__WEBPACK_IMPORTED_MODULE_2__.join(resolved, "imde.json"))) {
+                this._projectRoot = resolved;
+                return;
+            }
+            this.output.appendLine(`IMDE: configured projectDir "${resolved}" does not contain imde.json`);
+        }
+        const ws = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.workspaceFolders;
+        if (!ws?.length) {
+            this._projectRoot = null;
+            return;
+        }
+        let dir = ws[0].uri.fsPath;
+        let depth = 0;
+        const MAX_DEPTH = 10;
+        while (dir !== path__WEBPACK_IMPORTED_MODULE_2__.dirname(dir) && depth < MAX_DEPTH) {
+            if (fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(path__WEBPACK_IMPORTED_MODULE_2__.join(dir, "imde.json"))) {
+                this._projectRoot = dir;
+                return;
+            }
+            dir = path__WEBPACK_IMPORTED_MODULE_2__.dirname(dir);
+            depth++;
+        }
+        // Not found within limit — not an IMDE workspace
+        this._projectRoot = null;
+        this.output.appendLine(`IMDE: imde.json not found within ${MAX_DEPTH} levels above workspace root. Extension will stay idle.`);
+    }
+    static loginEnvPromise = null;
+    /** Kick off async login-shell env capture. Non-blocking — returns immediately. */
+    static warmupEnv() {
+        if (process.platform === "win32") {
+            ImdeRunner.loginEnvCache = { ...process.env };
+            return;
+        }
+        if (ImdeRunner.loginEnvPromise)
+            return;
+        // Fire-and-forget: capture login-shell PATH in background
+        ImdeRunner.loginEnvPromise = ImdeRunner.captureShellEnvAsync().then(env => {
+            ImdeRunner.loginEnvCache = env;
+            return env;
+        }).catch(() => {
+            // Fall back to process.env on failure
+            const fallback = { ...process.env };
+            ImdeRunner.loginEnvCache = fallback;
+            return fallback;
+        });
+    }
+    static resolveLoginEnv(_force = false) {
+        if (ImdeRunner.loginEnvCache) {
+            return ImdeRunner.loginEnvCache;
+        }
+        if (process.platform === "win32") {
+            ImdeRunner.loginEnvCache = { ...process.env };
+            return ImdeRunner.loginEnvCache;
+        }
+        // Still warming up — return process.env as fallback
+        return { ...process.env };
+    }
+    static async captureShellEnvAsync() {
+        const merged = { ...process.env };
+        const shell = process.env.SHELL || "/bin/bash";
+        const execShell = (args, timeout) => new Promise(resolve => {
+            const child = child_process__WEBPACK_IMPORTED_MODULE_1__.spawn(shell, args, {
+                timeout, stdio: ["ignore", "pipe", "pipe"],
+            });
+            let stdout = "";
+            child.stdout?.on("data", (d) => { stdout += d.toString("utf8"); });
+            child.on("close", () => resolve(stdout));
+            child.on("error", () => resolve(""));
+            setTimeout(() => { child.kill(); resolve(stdout); }, timeout);
+        });
+        const login = await execShell(["-l", "-c", "echo __PATH__:$PATH"], 3000);
+        const m1 = login.match(/__PATH__:(.+)/);
+        if (m1) {
+            merged.PATH = m1[1];
+        }
+        const interactive = await execShell(["-i", "-c", "echo __PATH__:$PATH"], 5000);
+        const m2 = interactive.match(/__PATH__:(.+)/);
+        if (m2) {
+            merged.PATH = m2[1];
+        }
+        return merged;
+    }
+    showOutput() {
+        this.output.show(true);
+    }
+    showCommandTerminal() {
+        if (this.terminal) {
+            this.terminal.show(true);
+            return;
+        }
+        if (!this.isValidImdeProject) {
+            return;
+        }
+        const cfg = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde");
+        const termName = cfg.get("terminalName") || "IMDE";
+        const existing = vscode__WEBPACK_IMPORTED_MODULE_0__.window.terminals.find(t => t.name === termName);
+        if (existing) {
+            this.terminal = existing;
+            existing.show(true);
+        }
+    }
+    log(message) {
+        this.output.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
+    }
+    /** Cached result of system Python probe — probe only once per session. */
+    static _systemPythonCache;
+    /** Find the Python executable to use (bundled or system). */
+    python() {
+        if (!this.isValidImdeProject)
+            return null;
+        const proj = this._projectRoot;
+        const platformDir = imdePlatformDir();
+        const bundled = path__WEBPACK_IMPORTED_MODULE_2__.join(proj, "tools", "python", platformDir, platformDir === "windows" ? "python.exe" : "bin/python3");
+        if (fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(bundled)) {
+            return bundled;
+        }
+        // Probe for system Python once per session (spawnSync is blocking).
+        if (ImdeRunner._systemPythonCache !== undefined) {
+            return ImdeRunner._systemPythonCache;
+        }
+        const env = ImdeRunner.resolveLoginEnv();
+        for (const name of platformDir === "windows" ? ["python", "python3"] : ["python3", "python"]) {
+            const result = child_process__WEBPACK_IMPORTED_MODULE_1__.spawnSync(name, ["--version"], { env, timeout: 3000 });
+            if (result.status === 0) {
+                ImdeRunner._systemPythonCache = name;
+                return name;
+            }
+        }
+        ImdeRunner._systemPythonCache = null;
+        return null;
+    }
+    imdePy() {
+        return path__WEBPACK_IMPORTED_MODULE_2__.join(this._projectRoot || "", "tools", "imde", "imde.py");
+    }
+    imdeBin() {
+        const proj = this._projectRoot;
+        if (!proj)
+            return null;
+        const candidates = process.platform === "win32"
+            ? ["tools/imde/bin/imde.cmd", "tools/imde/bin/imde.bat"]
+            : ["tools/imde/bin/imde"];
+        for (const rel of candidates) {
+            const bin = path__WEBPACK_IMPORTED_MODULE_2__.join(proj, rel);
+            if (fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(bin)) {
+                return bin;
+            }
+        }
+        return null;
+    }
+    spawnImdeBin(bin, args) {
+        if (process.platform === "win32") {
+            return { exe: bin, args };
+        }
+        try {
+            if ((fs__WEBPACK_IMPORTED_MODULE_3__.statSync(bin).mode & 0o111) === 0) {
+                return { exe: fs__WEBPACK_IMPORTED_MODULE_3__.existsSync("/bin/bash") ? "/bin/bash" : "bash", args: [bin, ...args] };
+            }
+        }
+        catch { /* fall through */ }
+        return { exe: bin, args };
+    }
+    getSharedTerminal(proj) {
+        const cfg = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde");
+        const termName = cfg.get("terminalName") || "IMDE";
+        const isUsable = (terminal) => !!terminal && terminal.exitStatus === undefined;
+        if (isUsable(this.terminal)) {
+            return { terminal: this.terminal, created: false };
+        }
+        this.terminalEnvReady = false;
+        this.terminalEnvReadyPromise = undefined;
+        const existing = vscode__WEBPACK_IMPORTED_MODULE_0__.window.terminals.find(t => t.name === termName && t.exitStatus === undefined);
+        if (existing) {
+            this.terminal = existing;
+            this.terminalEnvReady = false;
+            this.terminalEnvReadyPromise = undefined;
+            return { terminal: existing, created: false };
+        }
+        this.terminal = vscode__WEBPACK_IMPORTED_MODULE_0__.window.createTerminal({
+            name: termName,
+            cwd: proj,
+        });
+        this.terminalEnvReady = false;
+        this.terminalEnvReadyPromise = undefined;
+        return { terminal: this.terminal, created: true };
+    }
+    /** Run IMDE in the shared terminal. Use this for interactive commands. */
+    runTerminal(cmd, args = [], opts) {
+        if (!this.isValidImdeProject) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project (imde.json not found).");
+            return;
+        }
+        const proj = this._projectRoot;
+        const { terminal } = this.getSharedTerminal(proj);
+        if (cmd) {
+            void this.ensureTerminalEnv(proj).then(() => {
+                terminal.sendText(this.formatVisibleImdeCommand(cmd, args));
+            });
+        }
+        if (opts?.show) {
+            terminal.show(true);
+        }
+    }
+    /** Open the shared IMDE terminal and source the environment script.
+     *  Call this to ensure the shell can run `imde` commands directly. */
+    openEnvTerminal(show = true) {
+        if (!this.isValidImdeProject) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project (imde.json not found).");
+            return;
+        }
+        const proj = this._projectRoot;
+        const { terminal } = this.getSharedTerminal(proj);
+        void this.ensureTerminalEnv(proj);
+        if (show) {
+            terminal.show(true);
+        }
+    }
+    /** Source the environment on first use, then run doctor on later clicks. */
+    openEnvOrRunDoctor(show = true) {
+        if (!this.isValidImdeProject) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project (imde.json not found).");
+            return;
+        }
+        const proj = this._projectRoot;
+        const { terminal } = this.getSharedTerminal(proj);
+        if (this.terminalEnvReady) {
+            terminal.sendText(this.formatVisibleImdeCommand("doctor", []));
+        }
+        else {
+            void this.ensureTerminalEnv(proj);
+        }
+        if (show) {
+            terminal.show(true);
+        }
+    }
+    /** Source the full IMDE environment script once so the terminal can run short `imde ...` commands. */
+    ensureTerminalEnv(proj) {
+        if (this.terminalEnvReady) {
+            return Promise.resolve();
+        }
+        if (this.terminalEnvReadyPromise) {
+            return this.terminalEnvReadyPromise;
+        }
+        const { terminal } = this.getSharedTerminal(proj);
+        const sourceCmd = this.sourceCommand(proj);
+        if (!sourceCmd) {
+            this.terminalEnvReady = true;
+            return Promise.resolve();
+        }
+        const run = async () => {
+            const shellIntegration = await this.waitForShellIntegration(terminal, 3000);
+            if (shellIntegration) {
+                await this.executeTerminalSetupCommand(terminal, shellIntegration, sourceCmd);
+            }
+            else {
+                terminal.sendText(sourceCmd);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            this.terminalEnvReady = true;
+        };
+        this.terminalEnvReadyPromise = run().finally(() => {
+            this.terminalEnvReadyPromise = undefined;
+        });
+        return this.terminalEnvReadyPromise;
+    }
+    sourceCommand(proj, shellOverride) {
+        const imdeDir = path__WEBPACK_IMPORTED_MODULE_2__.join(proj, "tools", "imde");
+        const psEnv = path__WEBPACK_IMPORTED_MODULE_2__.join(imdeDir, "env.ps1");
+        const shEnv = path__WEBPACK_IMPORTED_MODULE_2__.join(imdeDir, "env.sh");
+        const shell = (shellOverride || vscode__WEBPACK_IMPORTED_MODULE_0__.env.shell || "").toLowerCase();
+        if (shell.includes("powershell") || shell.includes("pwsh")) {
+            return fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(psEnv) ? `. ${this.quoteTerminalArg(psEnv, shell)}` : null;
+        }
+        if (process.platform === "win32" && shell.includes("cmd")) {
+            return null;
+        }
+        // bash / zsh — use env.sh which auto-detects
+        if (!fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(shEnv)) {
+            return null;
+        }
+        const sourceBuiltin = shell.includes("bash") || shell.includes("zsh") ? "source" : ".";
+        return `${sourceBuiltin} ${this.quoteTerminalArg(shEnv, shell)}`;
+    }
+    run(cmd, args = [], opts) {
+        this.runTerminal(cmd, args, opts);
+    }
+    async runCommand(cmd, args = [], opts = {}) {
+        const run = async () => {
+            this.invalidateJsonCache();
+            const result = await this.execute(cmd, args, {
+                json: false,
+                streamOutput: opts.streamOutput ?? true,
+                displayTarget: opts.displayTarget ?? "terminal",
+                timeoutMs: opts.timeoutMs ?? this.commandTimeoutMs(),
+                onProgress: opts.onProgress,
+            });
+            this.invalidateJsonCache();
+            return result;
+        };
+        if (!opts.progressTitle) {
+            return run();
+        }
+        return vscode__WEBPACK_IMPORTED_MODULE_0__.window.withProgress({ location: vscode__WEBPACK_IMPORTED_MODULE_0__.ProgressLocation.Notification, title: opts.progressTitle, cancellable: false }, async (progress) => {
+            const started = Date.now();
+            progress.report({ message: opts.progressDetail ?? "Starting..." });
+            const timer = setInterval(() => {
+                const elapsed = Math.max(1, Math.floor((Date.now() - started) / 1000));
+                progress.report({ message: `${opts.progressDetail ?? "Running"} (${elapsed}s)` });
+            }, 1000);
+            try {
+                const result = await run();
+                const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+                progress.report({
+                    message: result.code === 0 && !result.timedOut
+                        ? `Completed in ${elapsed}s`
+                        : result.timedOut
+                            ? `Timed out after ${elapsed}s`
+                            : `Failed after ${elapsed}s`,
+                });
+                return result;
+            }
+            finally {
+                clearInterval(timer);
+            }
+        });
+    }
+    jsonCache = new Map();
+    static CACHE_TTL = 10000;
+    async captureJson(cmd, args = []) {
+        if (!this.isValidImdeProject)
+            return null;
+        const cacheKey = cmd + "|" + args.join(",");
+        const cached = this.jsonCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < ImdeRunner.CACHE_TTL) {
+            return cached.data;
+        }
+        const result = await this.execute(cmd, args, {
+            json: true,
+            streamOutput: false,
+            displayTarget: "output",
+            timeoutMs: this.captureTimeoutMs(),
+        });
+        if (result.code !== 0) {
+            const brief = result.stderr
+                ? result.stderr.split('\n').filter(l => !l.startsWith('  File ') && !l.startsWith('    ')).slice(-3).join('\n').trim()
+                : '';
+            this.output.appendLine(`IMDE captureJson(${cmd}) failed: exit ${result.code}${brief ? ' — ' + brief : ''}`);
+            return null;
+        }
+        try {
+            const data = JSON.parse(result.stdout);
+            this.jsonCache.set(cacheKey, { data, ts: Date.now() });
+            return data;
+        }
+        catch {
+            this.output.appendLine(`IMDE captureJson(${cmd}) returned invalid JSON.`);
+            this.output.appendLine(result.stdout.slice(0, 500));
+            return null;
+        }
+    }
+    execute(cmd, args, opts) {
+        if (!this.isValidImdeProject) {
+            return Promise.resolve({ code: null, stdout: "", stderr: "Not an IMDE project", timedOut: false, commandLine: "" });
+        }
+        const proj = this._projectRoot;
+        const imdeBin = this.imdeBin();
+        let spawnArgs;
+        let spawnExe;
+        if (imdeBin) {
+            const s = this.spawnImdeBin(imdeBin, [
+                "--project-dir", proj,
+                ...(opts.json ? ["--json"] : []),
+                cmd,
+                ...args,
+            ]);
+            spawnExe = s.exe;
+            spawnArgs = s.args;
+        }
+        else {
+            const py = this.python();
+            const imde = this.imdePy();
+            if (!py) {
+                vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage("Python not found");
+                return Promise.resolve({ code: null, stdout: "", stderr: "Python not found", timedOut: false, commandLine: "" });
+            }
+            if (!fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(imde)) {
+                const message = `IMDE CLI not found: ${imde}`;
+                vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(message);
+                return Promise.resolve({ code: null, stdout: "", stderr: message, timedOut: false, commandLine: "" });
+            }
+            spawnExe = py;
+            spawnArgs = [imde, "--project-dir", proj, ...(opts.json ? ["--json"] : []), cmd, ...args];
+        }
+        const commandLine = this.formatForLog([spawnExe, ...spawnArgs]);
+        if (opts.streamOutput) {
+            if (opts.displayTarget === "output") {
+                this.output.appendLine(`> ${commandLine}`);
+            }
+        }
+        if (opts.streamOutput && opts.displayTarget === "terminal") {
+            return this.executeInSharedTerminal([spawnExe, ...spawnArgs], {
+                cwd: proj,
+                commandLine,
+                timeoutMs: opts.timeoutMs,
+                onProgress: opts.onProgress,
+            });
+        }
+        return new Promise((resolve) => {
+            let stdout = "";
+            let stderr = "";
+            let timedOut = false;
+            let settled = false;
+            const loginEnv = ImdeRunner.resolveLoginEnv();
+            const proc = child_process__WEBPACK_IMPORTED_MODULE_1__.spawn(spawnExe, spawnArgs, {
+                cwd: proj,
+                env: {
+                    ...loginEnv,
+                    PYTHONIOENCODING: process.env.PYTHONIOENCODING || "utf-8",
+                },
+            });
+            const finish = (result) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                resolve(result);
+            };
+            const timer = opts.timeoutMs > 0
+                ? setTimeout(() => { timedOut = true; proc.kill(); }, opts.timeoutMs)
+                : undefined;
+            proc.stdout.on("data", (d) => {
+                const text = d.toString();
+                stdout += text;
+                if (opts.streamOutput) {
+                    this.output.append(text);
+                }
+                parseProgress(text);
+            });
+            const parseProgress = (text) => {
+                if (!opts.onProgress)
+                    return;
+                const m = text.match(/\[(\d+)\/(\d+)\]\s+(.+)/);
+                if (m) {
+                    opts.onProgress(parseInt(m[1], 10), parseInt(m[2], 10), m[3].trim());
+                }
+            };
+            proc.stderr.on("data", (d) => {
+                const text = d.toString();
+                stderr += text;
+                if (opts.streamOutput) {
+                    this.output.append(text);
+                }
+                parseProgress(text);
+            });
+            proc.on("error", (err) => {
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                try {
+                    proc.kill();
+                }
+                catch { /* best-effort */ }
+                finish({ code: null, stdout, stderr: stderr + err.message, timedOut, commandLine });
+            });
+            proc.on("close", (code) => {
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                if (opts.streamOutput) {
+                    this.output.appendLine("");
+                    this.output.appendLine(timedOut ? `Timed out: ${commandLine}` : `Exit code: ${code ?? "unknown"}`);
+                }
+                finish({ code, stdout, stderr, timedOut, commandLine });
+            });
+        });
+    }
+    executeInSharedTerminal(commandTokens, opts) {
+        const run = async () => {
+            const { terminal } = this.getSharedTerminal(opts.cwd);
+            terminal.show(true);
+            const visibleCommand = this.formatManagedTerminalCommand(commandTokens);
+            const shellIntegration = process.platform === "darwin"
+                ? undefined
+                : await this.waitForShellIntegration(terminal, 3000);
+            if (shellIntegration) {
+                try {
+                    return await this.executeWithShellIntegration(terminal, shellIntegration, visibleCommand, opts);
+                }
+                catch (err) {
+                    this.output.appendLine(`IMDE terminal shell integration failed, using script fallback: ${err?.message || err}`);
+                }
+            }
+            return this.executeWithTerminalScript(commandTokens, opts);
+        };
+        const queued = this.terminalCommandQueue.catch(() => undefined).then(run);
+        this.terminalCommandQueue = queued.then(() => undefined, () => undefined);
+        return queued;
+    }
+    waitForShellIntegration(terminal, timeoutMs) {
+        if (terminal.shellIntegration) {
+            return Promise.resolve(terminal.shellIntegration);
+        }
+        return new Promise(resolve => {
+            const timer = setTimeout(() => {
+                subscription.dispose();
+                resolve(undefined);
+            }, timeoutMs);
+            const subscription = vscode__WEBPACK_IMPORTED_MODULE_0__.window.onDidChangeTerminalShellIntegration(event => {
+                if (event.terminal === terminal) {
+                    clearTimeout(timer);
+                    subscription.dispose();
+                    resolve(event.shellIntegration);
+                }
+            });
+        });
+    }
+    executeTerminalSetupCommand(terminal, shellIntegration, commandLine) {
+        return new Promise(resolve => {
+            let execution;
+            let settled = false;
+            const finish = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                clearTimeout(timer);
+                subscription.dispose();
+                resolve();
+            };
+            const subscription = vscode__WEBPACK_IMPORTED_MODULE_0__.window.onDidEndTerminalShellExecution(event => {
+                if (event.terminal === terminal && event.execution === execution) {
+                    finish();
+                }
+            });
+            const timer = setTimeout(finish, 10000);
+            execution = shellIntegration.executeCommand(commandLine);
+        });
+    }
+    executeWithShellIntegration(terminal, shellIntegration, commandLine, opts) {
+        return new Promise(resolve => {
+            let execution;
+            let stdout = "";
+            let settled = false;
+            let timedOut = false;
+            let outputDone = Promise.resolve();
+            const finish = (code) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                endSubscription.dispose();
+                void (async () => {
+                    await Promise.race([
+                        outputDone,
+                        new Promise(resolveDrain => setTimeout(resolveDrain, 1000)),
+                    ]);
+                    resolve({
+                        code,
+                        stdout,
+                        stderr: "",
+                        timedOut,
+                        commandLine: opts.commandLine,
+                    });
+                })();
+            };
+            const endSubscription = vscode__WEBPACK_IMPORTED_MODULE_0__.window.onDidEndTerminalShellExecution(event => {
+                if (event.terminal === terminal && event.execution === execution) {
+                    finish(event.exitCode ?? null);
+                }
+            });
+            const timer = opts.timeoutMs > 0
+                ? setTimeout(() => {
+                    timedOut = true;
+                    // Best effort: ask the foreground shell command to stop.
+                    terminal.sendText("\x03", false);
+                    finish(null);
+                }, opts.timeoutMs)
+                : undefined;
+            execution = shellIntegration.executeCommand(commandLine);
+            outputDone = (async () => {
+                for await (const data of execution.read()) {
+                    const clean = this.stripTerminalControl(data);
+                    stdout += clean;
+                    this.parseProgress(clean, opts.onProgress);
+                }
+            })().catch(err => {
+                stdout += `\n[IMDE] Failed to read terminal output: ${err?.message || err}\n`;
+            });
+        });
+    }
+    executeWithTerminalScript(commandTokens, opts) {
+        return new Promise(resolve => {
+            const { terminal } = this.getSharedTerminal(opts.cwd);
+            const tempDir = fs__WEBPACK_IMPORTED_MODULE_3__.mkdtempSync(path__WEBPACK_IMPORTED_MODULE_2__.join(os__WEBPACK_IMPORTED_MODULE_4__.tmpdir(), "imde-"));
+            const logFile = path__WEBPACK_IMPORTED_MODULE_2__.join(tempDir, "command.log");
+            const exitFile = path__WEBPACK_IMPORTED_MODULE_2__.join(tempDir, "exit.code");
+            const visibleCommand = this.formatManagedTerminalCommand(commandTokens);
+            const script = this.createTerminalScript(visibleCommand, opts.cwd, logFile, exitFile, opts.commandLine);
+            let stdout = "";
+            let offset = 0;
+            let settled = false;
+            const consumeLog = () => {
+                if (!fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(logFile)) {
+                    return;
+                }
+                const text = fs__WEBPACK_IMPORTED_MODULE_3__.readFileSync(logFile, "utf8");
+                if (text.length <= offset) {
+                    return;
+                }
+                const chunk = this.stripTerminalControl(text.slice(offset));
+                offset = text.length;
+                stdout += chunk;
+                this.parseProgress(chunk, opts.onProgress);
+            };
+            const finish = (code, timedOut) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                clearTimeout(startupTimer);
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                clearInterval(poll);
+                consumeLog();
+                if (timedOut) {
+                    terminal.sendText("\x03", false);
+                }
+                this.cleanupTempDir(tempDir);
+                resolve({
+                    code,
+                    stdout,
+                    stderr: "",
+                    timedOut,
+                    commandLine: opts.commandLine,
+                });
+            };
+            const poll = setInterval(() => {
+                consumeLog();
+                if (!fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(exitFile)) {
+                    return;
+                }
+                const raw = fs__WEBPACK_IMPORTED_MODULE_3__.readFileSync(exitFile, "utf8").trim();
+                const parsed = Number.parseInt(raw, 10);
+                finish(Number.isFinite(parsed) ? parsed : null, false);
+            }, 250);
+            const timer = opts.timeoutMs > 0
+                ? setTimeout(() => finish(null, true), opts.timeoutMs)
+                : undefined;
+            const startupTimer = setTimeout(() => {
+                if (!fs__WEBPACK_IMPORTED_MODULE_3__.existsSync(logFile))
+                    finish(null, true);
+            }, 15000);
+            terminal.show(true);
+            terminal.sendText(script.commandLine);
+        });
+    }
+    createTerminalScript(visibleCommand, cwd, logFile, exitFile, commandLine) {
+        const shell = (vscode__WEBPACK_IMPORTED_MODULE_0__.env.shell || "").toLowerCase();
+        if (process.platform === "win32" && !this.isUnixLikeShell(shell)) {
+            const scriptPath = path__WEBPACK_IMPORTED_MODULE_2__.join(path__WEBPACK_IMPORTED_MODULE_2__.dirname(logFile), "run-imde.ps1");
+            const psShell = shell.includes("powershell") || shell.includes("pwsh") ? shell : "powershell";
+            const content = [
+                "$ErrorActionPreference = 'Continue'",
+                `Write-Host ${this.quoteTerminalArg(`[IMDE] > ${commandLine}`, psShell)}`,
+                `Set-Location -LiteralPath ${this.quoteTerminalArg(cwd, psShell)}`,
+                `[System.IO.File]::WriteAllText(${this.quoteTerminalArg(logFile, psShell)}, '')`,
+                "if (-not $env:PYTHONIOENCODING) { $env:PYTHONIOENCODING = 'utf-8' }",
+                `${visibleCommand} 2>&1 | Tee-Object -FilePath ${this.quoteTerminalArg(logFile, psShell)}`,
+                "$__imde_code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
+                `Set-Content -LiteralPath ${this.quoteTerminalArg(exitFile, psShell)} -Value $__imde_code -Encoding ascii`,
+                "",
+            ].join("\n");
+            fs__WEBPACK_IMPORTED_MODULE_3__.writeFileSync(scriptPath, content, "utf8");
+            if (shell.includes("cmd")) {
+                return { commandLine: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath.replace(/"/g, '""')}"` };
+            }
+            return { commandLine: `& ${this.quoteTerminalArg(scriptPath, psShell)}` };
+        }
+        const scriptPath = path__WEBPACK_IMPORTED_MODULE_2__.join(path__WEBPACK_IMPORTED_MODULE_2__.dirname(logFile), "run-imde.sh");
+        const shShell = shell || "sh";
+        const content = [
+            "#!/bin/sh",
+            `printf '%s\\n' ${this.quoteTerminalArg(`[IMDE] > ${commandLine}`, shShell)}`,
+            `cd ${this.quoteTerminalArg(cwd, shShell)} || { printf '%s\\n' 'IMDE: failed to enter project directory' | tee ${this.quoteTerminalArg(logFile, shShell)}; printf '%s' 1 > ${this.quoteTerminalArg(exitFile, shShell)}; exit 1; }`,
+            `: > ${this.quoteTerminalArg(logFile, shShell)}`,
+            "if [ -z \"${PYTHONIOENCODING+x}\" ]; then export PYTHONIOENCODING=utf-8; fi",
+            `{ ${visibleCommand} 2>&1; printf '%s' "$?" > ${this.quoteTerminalArg(exitFile, shShell)}; } | tee ${this.quoteTerminalArg(logFile, shShell)}`,
+            "",
+        ].join("\n");
+        fs__WEBPACK_IMPORTED_MODULE_3__.writeFileSync(scriptPath, content, { encoding: "utf8", mode: 0o700 });
+        return { commandLine: `sh ${this.quoteTerminalArg(scriptPath, shShell)}` };
+    }
+    isUnixLikeShell(shell) {
+        const normalized = shell.replace(/\\/g, "/").toLowerCase();
+        const name = normalized.split("/").pop() || normalized;
+        return ["bash", "bash.exe", "zsh", "zsh.exe", "sh", "sh.exe", "fish", "fish.exe"].includes(name);
+    }
+    captureTimeoutMs() {
+        return vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde").get("captureTimeoutMs") ?? 15000;
+    }
+    commandTimeoutMs() {
+        return vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde").get("commandTimeoutMs") ?? 0;
+    }
+    formatForLog(tokens) {
+        return tokens.map((token) => token.includes(" ") ? `"${token}"` : token).join(" ");
+    }
+    formatVisibleImdeCommand(cmd, args) {
+        const shell = (vscode__WEBPACK_IMPORTED_MODULE_0__.env.shell || "").toLowerCase();
+        const tokens = ["imde", cmd, ...args].filter(Boolean);
+        return tokens.map((token) => this.quoteTerminalArg(token, shell, { bareSimple: true })).join(" ");
+    }
+    formatManagedTerminalCommand(tokens) {
+        const shell = (vscode__WEBPACK_IMPORTED_MODULE_0__.env.shell || "").toLowerCase();
+        const command = tokens
+            .map((token) => this.quoteTerminalArg(token, shell, { bareSimple: true }))
+            .join(" ");
+        return shell.includes("powershell") || shell.includes("pwsh") ? `& ${command}` : command;
+    }
+    parseProgress(text, onProgress) {
+        if (!onProgress)
+            return;
+        const m = text.match(/\[(\d+)\/(\d+)\]\s+(.+)/);
+        if (m) {
+            onProgress(parseInt(m[1], 10), parseInt(m[2], 10), m[3].trim());
+        }
+    }
+    stripTerminalControl(text) {
+        // eslint-disable-next-line no-control-regex
+        return text
+            .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+            .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n");
+    }
+    cleanupTempDir(dir) {
+        setTimeout(() => {
+            try {
+                fs__WEBPACK_IMPORTED_MODULE_3__.rmSync(dir, { recursive: true, force: true });
+            }
+            catch {
+                // Best-effort cleanup; stale temp logs are harmless.
+            }
+        }, 1000);
+    }
+    quoteTerminalArg(token, shell, options) {
+        if (!token) {
+            return "''";
+        }
+        if (options?.bareSimple && /^[A-Za-z0-9_./:@%+=,-]+$/.test(token)) {
+            return token;
+        }
+        if (shell.includes("powershell") || shell.includes("pwsh")) {
+            return `'${token.replace(/'/g, "''")}'`;
+        }
+        if (process.platform === "win32" && shell.includes("cmd")) {
+            return `"${token.replace(/"/g, '\\"')}"`;
+        }
+        return `'${token.replace(/'/g, "'\\''")}'`;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/intelliSense.ts"
+/*!*****************************!*\
+  !*** ./src/intelliSense.ts ***!
+  \*****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   parseCompileCommands: () => (/* binding */ parseCompileCommands),
+/* harmony export */   syncIntelliSense: () => (/* binding */ syncIntelliSense),
+/* harmony export */   writeCppProperties: () => (/* binding */ writeCppProperties)
+/* harmony export */ });
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! path */ "path");
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(path__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! fs */ "fs");
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(fs__WEBPACK_IMPORTED_MODULE_1__);
+
+
+/**
+ * Parse compile_commands.json and extract IntelliSense configuration.
+ * Returns null if the file doesn't exist or is empty.
+ */
+function parseCompileCommands(projectDir) {
+    const buildDir = path__WEBPACK_IMPORTED_MODULE_0__.join(projectDir, "build");
+    const ccPath = path__WEBPACK_IMPORTED_MODULE_0__.join(buildDir, "compile_commands.json");
+    if (!fs__WEBPACK_IMPORTED_MODULE_1__.existsSync(ccPath)) {
+        return null;
+    }
+    let raw;
+    try {
+        raw = fs__WEBPACK_IMPORTED_MODULE_1__.readFileSync(ccPath, "utf-8");
+    }
+    catch {
+        return null;
+    }
+    let entries;
+    try {
+        entries = JSON.parse(raw);
+    }
+    catch {
+        return null;
+    }
+    if (!Array.isArray(entries) || entries.length === 0) {
+        return null;
+    }
+    // Collect unique args across all compilation units
+    const includeDirs = new Set();
+    const defines = new Set();
+    const stdFlags = new Set();
+    let compilerPath = "";
+    const resolveArgPath = (arg, cwd) => {
+        if (path__WEBPACK_IMPORTED_MODULE_0__.isAbsolute(arg))
+            return arg;
+        return path__WEBPACK_IMPORTED_MODULE_0__.resolve(cwd, arg);
+    };
+    for (const entry of entries) {
+        const cwd = entry.directory || buildDir;
+        // First entry's command/arguments give us the compiler path
+        const compiler = entry.command
+            ? entry.command.split(/\s+/)[0]
+            : entry.arguments?.[0] || "";
+        if (compiler && !compilerPath) {
+            compilerPath = compiler.includes(path__WEBPACK_IMPORTED_MODULE_0__.sep)
+                ? resolveArgPath(compiler, cwd)
+                : compiler;
+        }
+        const tokens = extractTokens(entry, cwd);
+        for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i];
+            if (token === "-I" || token === "-isystem" || token === "/I") {
+                const dir = tokens[i + 1];
+                if (dir) {
+                    includeDirs.add(resolveArgPath(dir, cwd));
+                    i++;
+                }
+            }
+            else if (token.startsWith("-I") && token.length > 2) {
+                includeDirs.add(resolveArgPath(token.slice(2), cwd));
+            }
+            else if (token.startsWith("/I") && token.length > 2) {
+                includeDirs.add(resolveArgPath(token.slice(2), cwd));
+            }
+            else if (token.startsWith("-isystem") && token.length > "-isystem".length) {
+                includeDirs.add(resolveArgPath(token.slice("-isystem".length), cwd));
+            }
+            else if (token === "-D" || token === "/D") {
+                const def = tokens[i + 1];
+                if (def) {
+                    defines.add(def);
+                    i++;
+                }
+            }
+            else if (token.startsWith("-D") && token.length > 2) {
+                defines.add(token.slice(2));
+            }
+            else if (token.startsWith("/D") && token.length > 2) {
+                defines.add(token.slice(2));
+            }
+            else if (token.startsWith("-std=")) {
+                stdFlags.add(token.slice(5));
+            }
+        }
+    }
+    // Determine C standard
+    const stdList = Array.from(stdFlags);
+    const cStd = stdList.find(s => s.startsWith("c")) ||
+        stdList.find(s => s.startsWith("gnu"));
+    let cStandard = "c17";
+    if (cStd) {
+        const m = cStd.match(/^(?:gnu)?(\d+)/);
+        if (m)
+            cStandard = `c${m[1]}`;
+    }
+    const cppStd = stdList.find(s => s.startsWith("c++")) ||
+        stdList.find(s => s.startsWith("gnu++"));
+    // Determine IntelliSense mode
+    const intelliSenseMode = compilerPath.includes("riscv")
+        ? "linux-gcc-riscv32"
+        : compilerPath.includes("arm")
+            ? "linux-gcc-arm"
+            : guessPlatformMode();
+    return {
+        includePath: Array.from(includeDirs).sort(),
+        defines: Array.from(defines).sort(),
+        compilerPath,
+        cStandard,
+        intelliSenseMode,
+        fileCount: entries.length,
+    };
+}
+function extractTokens(entry, cwd) {
+    if (entry.arguments && entry.arguments.length > 0) {
+        return entry.arguments.slice(1); // skip compiler path
+    }
+    if (entry.command) {
+        return tokenizeCommand(entry.command).slice(1); // skip compiler path
+    }
+    return [];
+}
+/** Split a shell command line into tokens, handling quotes. */
+function tokenizeCommand(cmd) {
+    const tokens = [];
+    let current = "";
+    let inSingle = false;
+    let inDouble = false;
+    let escaped = false;
+    for (const ch of cmd) {
+        if (escaped) {
+            current += ch;
+            escaped = false;
+            continue;
+        }
+        if (ch === "\\") {
+            escaped = true;
+            continue;
+        }
+        if (ch === "'" && !inDouble) {
+            inSingle = !inSingle;
+            continue;
+        }
+        if (ch === '"' && !inSingle) {
+            inDouble = !inDouble;
+            continue;
+        }
+        if ((ch === " " || ch === "\t") && !inSingle && !inDouble) {
+            if (current) {
+                tokens.push(current);
+                current = "";
+            }
+            continue;
+        }
+        current += ch;
+    }
+    if (current)
+        tokens.push(current);
+    return tokens;
+}
+function guessPlatformMode() {
+    switch (process.platform) {
+        case "win32":
+            return "windows-gcc-x86";
+        case "darwin":
+            return "macos-clang-x64";
+        default:
+            return "linux-gcc-x64";
+    }
+}
+/**
+ * Generate c_cpp_properties.json content from parsed compile commands.
+ */
+function generateCppProperties(summary) {
+    return {
+        configurations: [
+            {
+                name: "IMDE",
+                includePath: summary.includePath.concat(["${workspaceFolder}/**"]),
+                defines: summary.defines,
+                compilerPath: summary.compilerPath,
+                cStandard: summary.cStandard,
+                cppStandard: "c++17",
+                intelliSenseMode: summary.intelliSenseMode,
+                compilerArgs: [],
+            },
+        ],
+        version: 4,
+    };
+}
+/**
+ * Write .vscode/c_cpp_properties.json if it needs to be created or updated.
+ * Returns a summary of what was written, or null if no changes needed.
+ */
+function writeCppProperties(projectDir, summary) {
+    const vscodeDir = path__WEBPACK_IMPORTED_MODULE_0__.join(projectDir, ".vscode");
+    const propsPath = path__WEBPACK_IMPORTED_MODULE_0__.join(vscodeDir, "c_cpp_properties.json");
+    // Generate the new config
+    const newProps = generateCppProperties(summary);
+    // Check if existing config is from IMDE — if so, update it in place.
+    // If not from IMDE, don't touch (user may have custom config).
+    if (fs__WEBPACK_IMPORTED_MODULE_1__.existsSync(propsPath)) {
+        try {
+            const existing = JSON.parse(fs__WEBPACK_IMPORTED_MODULE_1__.readFileSync(propsPath, "utf-8"));
+            const configs = existing.configurations || [];
+            const imdeIdx = configs.findIndex((c) => c.name === "IMDE");
+            if (imdeIdx >= 0) {
+                const previous = JSON.stringify(existing);
+                configs[imdeIdx] = newProps.configurations[0];
+                existing.configurations = configs;
+                const next = JSON.stringify(existing);
+                if (previous !== next) {
+                    fs__WEBPACK_IMPORTED_MODULE_1__.mkdirSync(vscodeDir, { recursive: true });
+                    fs__WEBPACK_IMPORTED_MODULE_1__.writeFileSync(propsPath, JSON.stringify(existing, null, 2), "utf-8");
+                }
+                return {
+                    created: false,
+                    changed: previous !== next,
+                    path: propsPath,
+                    defines: summary.defines.length,
+                    includes: summary.includePath.length,
+                };
+            }
+            // IMDE config not found — don't overwrite user's custom config
+            return null;
+        }
+        catch {
+            return null;
+        }
+    }
+    // Fresh creation
+    fs__WEBPACK_IMPORTED_MODULE_1__.mkdirSync(vscodeDir, { recursive: true });
+    fs__WEBPACK_IMPORTED_MODULE_1__.writeFileSync(propsPath, JSON.stringify(newProps, null, 2), "utf-8");
+    return {
+        created: true,
+        changed: true,
+        path: propsPath,
+        defines: summary.defines.length,
+        includes: summary.includePath.length,
+    };
+}
+/**
+ * High-level entry: parse compile_commands.json → write .vscode/c_cpp_properties.json.
+ * Safe to call even if compile_commands.json doesn't exist yet.
+ */
+function syncIntelliSense(projectDir) {
+    const summary = parseCompileCommands(projectDir);
+    if (!summary) {
+        return null;
+    }
+    const result = writeCppProperties(projectDir, summary);
+    if (!result) {
+        return null;
+    }
+    if (!result.changed) {
+        return null;
+    }
+    const action = result.created ? "Created" : "Updated";
+    return `${action} IntelliSense: ${summary.defines} defines, ${summary.includePath.length} include paths (${summary.fileCount} source files)`;
+}
+
+
+/***/ },
+
+/***/ "./src/logger/logger.ts"
+/*!******************************!*\
+  !*** ./src/logger/logger.ts ***!
+  \******************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Logger: () => (/* binding */ Logger)
+/* harmony export */ });
+// Copyright 2025 Kconfig VSCode Extension Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// Try to import vscode, but make it optional for testing
+let vscode;
+try {
+    vscode = __webpack_require__(/*! vscode */ "vscode");
+}
+catch (e) {
+    // Running outside of VSCode environment (e.g., in tests)
+    vscode = null;
+}
+class Logger {
+    static resolveMessage(message) {
+        if (typeof message === "function") {
+            try {
+                return message();
+            }
+            catch (error) {
+                return `[LOGGER_MESSAGE_FACTORY_ERROR] ${error instanceof Error ? error.message : String(error)}`;
+            }
+        }
+        return message;
+    }
+    static outputChannel = null;
+    static CONFIG_CACHE_TTL_MS = 1000;
+    static logConfigCache = null;
+    static debugConfigCache = null;
+    static getOutputChannel() {
+        if (!Logger.outputChannel && vscode) {
+            Logger.outputChannel = vscode.window.createOutputChannel("IMDE");
+        }
+        return Logger.outputChannel;
+    }
+    /**
+     * 获取日志配置
+     */
+    static getLogConfig() {
+        const now = Date.now();
+        if (Logger.logConfigCache && (now - Logger.logConfigCache.timestamp) < Logger.CONFIG_CACHE_TTL_MS) {
+            return Logger.logConfigCache.value;
+        }
+        let configValue;
+        if (!vscode) {
+            configValue = {
+                enabled: false,
+                levels: {
+                    info: false,
+                    warn: false,
+                    error: false,
+                    debug: false
+                }
+            };
+        }
+        else {
+            const logConfig = vscode.workspace.getConfiguration('imde.guiConfig.log');
+            configValue = {
+                enabled: logConfig.get('enabled', false),
+                levels: {
+                    info: logConfig.get('level.info', false),
+                    warn: logConfig.get('level.warn', false),
+                    error: logConfig.get('level.error', false),
+                    debug: logConfig.get('level.debug', false)
+                }
+            };
+        }
+        Logger.logConfigCache = { value: configValue, timestamp: now };
+        return configValue;
+    }
+    /**
+     * 获取调试配置
+     */
+    static getDebugConfig() {
+        const now = Date.now();
+        if (Logger.debugConfigCache && (now - Logger.debugConfigCache.timestamp) < Logger.CONFIG_CACHE_TTL_MS) {
+            return Logger.debugConfigCache.value;
+        }
+        let configValue;
+        if (!vscode) {
+            configValue = {
+                enabled: false,
+                parser: false,
+                visibility: false,
+                menu: false,
+                select: false,
+                source: false
+            };
+        }
+        else {
+            const config = vscode.workspace.getConfiguration('imde.guiConfig.debug');
+            configValue = {
+                enabled: config.get('enabled', false),
+                parser: config.get('parser', false),
+                visibility: config.get('visibility', false),
+                menu: config.get('menu', false),
+                select: config.get('select', false),
+                source: config.get('source', false)
+            };
+        }
+        Logger.debugConfigCache = { value: configValue, timestamp: now };
+        return configValue;
+    }
+    /**
+     * 通用调试日志方法
+     */
+    static debugLog(category, message, categoryEnabled) {
+        const debugConfig = Logger.getDebugConfig();
+        // 总开关未开启时直接返回
+        if (!debugConfig.enabled) {
+            return;
+        }
+        // 分类开关未开启时直接返回
+        if (!categoryEnabled) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const resolvedMessage = Logger.resolveMessage(message);
+        const logMessage = `[${timestamp}] [DEBUG:${category}] ${resolvedMessage}`;
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.appendLine(logMessage);
+        }
+        // console.debug(logMessage);
+    }
+    static info(message) {
+        const logConfig = Logger.getLogConfig();
+        if (!logConfig.enabled || !logConfig.levels.info) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const resolvedMessage = Logger.resolveMessage(message);
+        const logMessage = `[${timestamp}] [INFO] ${resolvedMessage}`;
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.appendLine(logMessage);
+        }
+    }
+    static warn(message) {
+        const logConfig = Logger.getLogConfig();
+        if (!logConfig.enabled || !logConfig.levels.warn) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const resolvedMessage = Logger.resolveMessage(message);
+        const logMessage = `[${timestamp}] [WARN] ${resolvedMessage}`;
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.appendLine(logMessage);
+        }
+        // console.warn(logMessage);
+    }
+    static error(message, error, context) {
+        // Error logs are treated as important and are always emitted.
+        const timestamp = new Date().toISOString();
+        let errorMessage = `[${timestamp}] [ERROR] ${message}`;
+        if (context) {
+            errorMessage += ` (Context: ${context})`;
+        }
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.appendLine(errorMessage);
+        }
+        // console.error(errorMessage);
+        if (error) {
+            const stackTrace = `[${timestamp}] [ERROR] Stack trace: ${error.stack || error.message}`;
+            if (channel) {
+                channel.appendLine(stackTrace);
+            }
+            // console.error(stackTrace);
+        }
+    }
+    static debug(message) {
+        const logConfig = Logger.getLogConfig();
+        if (!logConfig.enabled || !logConfig.levels.debug) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const resolvedMessage = Logger.resolveMessage(message);
+        const logMessage = `[${timestamp}] [DEBUG] ${resolvedMessage}`;
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.appendLine(logMessage);
+        }
+        // console.debug(logMessage);
+    }
+    /**
+     * 解析器调试日志 (CONFIG_PARSER, IF_PARSER)
+     */
+    static debugParser(message) {
+        const debugConfig = Logger.getDebugConfig();
+        Logger.debugLog('PARSER', message, debugConfig.parser);
+    }
+    /**
+     * 可见性调试日志 (VISIBILITY_DEBUG)
+     */
+    static debugVisibility(message) {
+        const debugConfig = Logger.getDebugConfig();
+        Logger.debugLog('VISIBILITY', message, debugConfig.visibility);
+    }
+    /**
+     * 菜单渲染调试日志 (MENU_RENDER_DEBUG, INDENT_DEBUG)
+     */
+    static debugMenu(message) {
+        const debugConfig = Logger.getDebugConfig();
+        Logger.debugLog('MENU', message, debugConfig.menu);
+    }
+    /**
+     * select语句调试日志 (SELECT_INIT)
+     */
+    static debugSelect(message) {
+        const debugConfig = Logger.getDebugConfig();
+        Logger.debugLog('SELECT', message, debugConfig.select);
+    }
+    /**
+     * 源文件处理调试日志 (SOURCE_DEBUG)
+     */
+    static debugSource(message) {
+        const debugConfig = Logger.getDebugConfig();
+        Logger.debugLog('SOURCE', message, debugConfig.source);
+    }
+    /**
+     * 配置写入调试日志 (WRITER_DEBUG)
+     */
+    static debugWriter(message) {
+        const debugConfig = Logger.getDebugConfig();
+        // For now, use the debug config enabled flag
+        // In the future, we could add a separate writer debug flag
+        Logger.debugLog('WRITER', message, debugConfig.enabled);
+    }
+    static show() {
+        const channel = Logger.getOutputChannel();
+        if (channel) {
+            channel.show();
+        }
+    }
+    static dispose() {
+        if (Logger.outputChannel) {
+            Logger.outputChannel.dispose();
+            Logger.outputChannel = null;
+        }
+        Logger.logConfigCache = null;
+        Logger.debugConfigCache = null;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/menuconfig/KconfigSessionCache.ts"
+/*!***********************************************!*\
+  !*** ./src/menuconfig/KconfigSessionCache.ts ***!
+  \***********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   KconfigSessionCache: () => (/* binding */ KconfigSessionCache)
+/* harmony export */ });
+/* harmony import */ var crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! crypto */ "crypto");
+/* harmony import */ var crypto__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(crypto__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! fs */ "fs");
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(fs__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! path */ "path");
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(path__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _logger_logger__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../logger/logger */ "./src/logger/logger.ts");
+
+
+
+
+class KconfigSessionCache {
+    static CACHE_VERSION = 5;
+    static CACHE_KEY_VERSION = "v5";
+    static MAX_STAT_CONCURRENCY = 64;
+    static HOT_CACHE_TTL_MS = 10000;
+    static HOT_CACHE_MAX_ENTRIES = 4;
+    static HOT_CACHE_SAMPLE_SIZE = 12;
+    static hotCache = new Map();
+    cacheDir;
+    constructor(workspaceFolder) {
+        this.cacheDir = path__WEBPACK_IMPORTED_MODULE_2__.join(workspaceFolder, ".kconfig-cache");
+    }
+    static buildCacheKey(mainKconfigFile) {
+        return crypto__WEBPACK_IMPORTED_MODULE_0__.createHash("sha1")
+            .update(`${path__WEBPACK_IMPORTED_MODULE_2__.normalize(mainKconfigFile)}|${KconfigSessionCache.CACHE_KEY_VERSION}`)
+            .digest("hex");
+    }
+    static clearHotCache() {
+        KconfigSessionCache.hotCache.clear();
+    }
+    async invalidate(cacheKey) {
+        if (cacheKey) {
+            KconfigSessionCache.hotCache.delete(cacheKey);
+            try {
+                await fs__WEBPACK_IMPORTED_MODULE_1__.promises.unlink(this.getCacheFilePath(cacheKey));
+            }
+            catch {
+                // Cache invalidation is best-effort.
+            }
+            return;
+        }
+        KconfigSessionCache.clearHotCache();
+        try {
+            await fs__WEBPACK_IMPORTED_MODULE_1__.promises.rm(this.cacheDir, { recursive: true, force: true });
+        }
+        catch {
+            // Cache invalidation is best-effort.
+        }
+    }
+    async load(cacheKey) {
+        const hotCached = await this.tryLoadFromHotCache(cacheKey);
+        if (hotCached) {
+            return hotCached;
+        }
+        const cacheFilePath = this.getCacheFilePath(cacheKey);
+        try {
+            const content = await fs__WEBPACK_IMPORTED_MODULE_1__.promises.readFile(cacheFilePath, "utf8");
+            const payload = JSON.parse(content);
+            if (!payload ||
+                payload.version !== KconfigSessionCache.CACHE_VERSION ||
+                payload.cacheKey !== cacheKey ||
+                !Array.isArray(payload.files) ||
+                !Array.isArray(payload.menus)) {
+                return null;
+            }
+            const valid = await this.validateFileSignatures(payload.files);
+            if (!valid) {
+                KconfigSessionCache.hotCache.delete(cacheKey);
+                return null;
+            }
+            this.updateHotCache(cacheKey, payload.files, payload.menus);
+            return this.cloneMenus(payload.menus);
+        }
+        catch (error) {
+            const err = error;
+            if (err && err.code === "ENOENT") {
+                KconfigSessionCache.hotCache.delete(cacheKey);
+                return null;
+            }
+            _logger_logger__WEBPACK_IMPORTED_MODULE_3__.Logger.debug(() => `[SESSION_CACHE] Load failed: ${err?.message || String(error)}`);
+            return null;
+        }
+    }
+    async save(cacheKey, menus, parsedFiles) {
+        if (!Array.isArray(menus) || menus.length === 0 || !Array.isArray(parsedFiles) || parsedFiles.length === 0) {
+            return;
+        }
+        const normalizedFiles = Array.from(new Set(parsedFiles.map((filePath) => path__WEBPACK_IMPORTED_MODULE_2__.normalize(filePath)))).sort((a, b) => a.localeCompare(b));
+        const signatures = await this.collectFileSignatures(normalizedFiles);
+        if (signatures.length === 0) {
+            return;
+        }
+        const payload = {
+            version: KconfigSessionCache.CACHE_VERSION,
+            cacheKey,
+            createdAt: Date.now(),
+            files: signatures,
+            menus,
+        };
+        const cacheFilePath = this.getCacheFilePath(cacheKey);
+        const tempFilePath = `${cacheFilePath}.tmp`;
+        try {
+            await fs__WEBPACK_IMPORTED_MODULE_1__.promises.mkdir(this.cacheDir, { recursive: true });
+            await fs__WEBPACK_IMPORTED_MODULE_1__.promises.writeFile(tempFilePath, JSON.stringify(payload), "utf8");
+            await fs__WEBPACK_IMPORTED_MODULE_1__.promises.rename(tempFilePath, cacheFilePath);
+            this.updateHotCache(cacheKey, signatures, menus);
+        }
+        catch (error) {
+            _logger_logger__WEBPACK_IMPORTED_MODULE_3__.Logger.debug(() => `[SESSION_CACHE] Save failed: ${error instanceof Error ? error.message : String(error)}`);
+            try {
+                await fs__WEBPACK_IMPORTED_MODULE_1__.promises.unlink(tempFilePath);
+            }
+            catch {
+                // noop
+            }
+        }
+    }
+    getCacheFilePath(cacheKey) {
+        return path__WEBPACK_IMPORTED_MODULE_2__.join(this.cacheDir, `${cacheKey}.json`);
+    }
+    async tryLoadFromHotCache(cacheKey) {
+        const entry = KconfigSessionCache.hotCache.get(cacheKey);
+        if (!entry) {
+            return null;
+        }
+        if (Date.now() - entry.loadedAt > KconfigSessionCache.HOT_CACHE_TTL_MS) {
+            KconfigSessionCache.hotCache.delete(cacheKey);
+            return null;
+        }
+        const sampleValid = await this.validateSampledSignatures(entry.files, KconfigSessionCache.HOT_CACHE_SAMPLE_SIZE);
+        if (!sampleValid) {
+            KconfigSessionCache.hotCache.delete(cacheKey);
+            return null;
+        }
+        return this.cloneMenus(entry.menus);
+    }
+    updateHotCache(cacheKey, files, menus) {
+        KconfigSessionCache.hotCache.set(cacheKey, {
+            loadedAt: Date.now(),
+            files,
+            menus: this.cloneMenus(menus),
+        });
+        if (KconfigSessionCache.hotCache.size <= KconfigSessionCache.HOT_CACHE_MAX_ENTRIES) {
+            return;
+        }
+        let oldestKey = null;
+        let oldestTs = Number.MAX_SAFE_INTEGER;
+        for (const [key, value] of KconfigSessionCache.hotCache.entries()) {
+            if (value.loadedAt < oldestTs) {
+                oldestTs = value.loadedAt;
+                oldestKey = key;
+            }
+        }
+        if (oldestKey) {
+            KconfigSessionCache.hotCache.delete(oldestKey);
+        }
+    }
+    async validateSampledSignatures(signatures, sampleSize) {
+        if (!Array.isArray(signatures) || signatures.length === 0) {
+            return false;
+        }
+        if (signatures.length <= sampleSize) {
+            return this.validateFileSignatures(signatures);
+        }
+        const sampled = [];
+        const seen = new Set();
+        const normalizedSampleSize = Math.max(2, sampleSize);
+        const step = Math.max(1, Math.floor((signatures.length - 1) / (normalizedSampleSize - 1)));
+        for (let i = 0; i < normalizedSampleSize; i++) {
+            const index = i === normalizedSampleSize - 1
+                ? signatures.length - 1
+                : Math.min(i * step, signatures.length - 1);
+            if (!seen.has(index)) {
+                seen.add(index);
+                sampled.push(signatures[index]);
+            }
+        }
+        return this.validateFileSignatures(sampled);
+    }
+    cloneMenus(menus) {
+        return JSON.parse(JSON.stringify(menus));
+    }
+    async validateFileSignatures(signatures) {
+        if (!Array.isArray(signatures) || signatures.length === 0) {
+            return false;
+        }
+        const [rootFile, ...rest] = signatures;
+        if (!(await this.isSignatureMatched(rootFile))) {
+            return false;
+        }
+        const results = await this.mapWithConcurrency(rest, KconfigSessionCache.MAX_STAT_CONCURRENCY, async (entry) => {
+            return this.isSignatureMatched(entry);
+        });
+        return results.every((matched) => matched === true);
+    }
+    async collectFileSignatures(files) {
+        const collected = await this.mapWithConcurrency(files, KconfigSessionCache.MAX_STAT_CONCURRENCY, async (filePath) => {
+            try {
+                const stat = await fs__WEBPACK_IMPORTED_MODULE_1__.promises.stat(filePath);
+                if (!stat.isFile()) {
+                    return null;
+                }
+                return {
+                    path: filePath,
+                    size: stat.size,
+                    mtimeMs: stat.mtimeMs,
+                };
+            }
+            catch {
+                return null;
+            }
+        });
+        return collected.filter((entry) => !!entry);
+    }
+    async isSignatureMatched(entry) {
+        try {
+            const stat = await fs__WEBPACK_IMPORTED_MODULE_1__.promises.stat(entry.path);
+            return stat.isFile() && stat.size === entry.size && stat.mtimeMs === entry.mtimeMs;
+        }
+        catch {
+            return false;
+        }
+    }
+    async mapWithConcurrency(items, concurrency, worker) {
+        if (items.length === 0) {
+            return [];
+        }
+        const limit = Math.max(1, Math.min(concurrency, items.length));
+        const results = new Array(items.length);
+        let cursor = 0;
+        const run = async () => {
+            let current = cursor;
+            cursor += 1;
+            while (current < items.length) {
+                results[current] = await worker(items[current]);
+                current = cursor;
+                cursor += 1;
+            }
+        };
+        await Promise.all(Array.from({ length: limit }, () => run()));
+        return results;
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/menuconfig/fileWatcher.ts"
+/*!***************************************!*\
+  !*** ./src/menuconfig/fileWatcher.ts ***!
+  \***************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   FileWatcher: () => (/* binding */ FileWatcher)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _KconfigSessionCache__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./KconfigSessionCache */ "./src/menuconfig/KconfigSessionCache.ts");
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+class FileWatcher {
+    static instance;
+    fileWatchers = [];
+    context;
+    ignoreNextChangeTimestamp = 0;
+    constructor(context) {
+        this.context = context;
+        FileWatcher.instance = this;
+    }
+    static getInstance() {
+        return FileWatcher.instance;
+    }
+    /**
+     * 忽略接下来一段时间内的文件变化通知（用于内部保存）
+     * @param durationMs 忽略时长（毫秒），默认 1000ms
+     */
+    ignoreNextChange(durationMs = 1000) {
+        this.ignoreNextChangeTimestamp = Date.now() + durationMs;
+    }
+    initialize() {
+        const workspaceFolder = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+        const configPattern = new vscode__WEBPACK_IMPORTED_MODULE_0__.RelativePattern(workspaceFolder, '**/{sdkconfig,defconfig,.config,*_defconfig}');
+        const kconfigPattern = new vscode__WEBPACK_IMPORTED_MODULE_0__.RelativePattern(workspaceFolder, '**/{Kconfig,Kconfig.*}');
+        this.registerWatcher(configPattern, (uri) => this.handleConfigFileChange(uri));
+        this.registerWatcher(kconfigPattern, (uri) => this.handleKconfigFileChange(uri));
+    }
+    registerWatcher(pattern, onChange) {
+        const watcher = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.createFileSystemWatcher(pattern);
+        watcher.onDidCreate((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+        watcher.onDidChange((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+        watcher.onDidDelete((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+        this.fileWatchers.push(watcher);
+        this.context.subscriptions.push(watcher);
+    }
+    getFileName(uri) {
+        return uri.fsPath.split(/[\\/]/).pop() || 'Unknown';
+    }
+    handleConfigFileChange(uri) {
+        if (Date.now() < this.ignoreNextChangeTimestamp) {
+            return;
+        }
+        const fileName = this.getFileName(uri);
+        vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInformationMessage(`Configuration file ${fileName} has been modified externally.`);
+    }
+    handleKconfigFileChange(uri) {
+        if (Date.now() < this.ignoreNextChangeTimestamp) {
+            return;
+        }
+        _KconfigSessionCache__WEBPACK_IMPORTED_MODULE_1__.KconfigSessionCache.clearHotCache();
+        const workspaceFolder = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getWorkspaceFolder(uri);
+        if (workspaceFolder) {
+            const cache = new _KconfigSessionCache__WEBPACK_IMPORTED_MODULE_1__.KconfigSessionCache(workspaceFolder.uri.fsPath);
+            void cache.invalidate();
+        }
+        const fileName = this.getFileName(uri);
+        vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInformationMessage(`Kconfig file ${fileName} has changed. Refresh GUI Config to reload the menu tree.`);
+    }
+    dispose() {
+        this.fileWatchers.forEach((watcher) => watcher.dispose());
+        this.fileWatchers = [];
+        if (FileWatcher.instance === this) {
+            FileWatcher.instance = undefined;
+        }
+    }
+}
+
+
+/***/ },
+
+/***/ "vscode"
+/*!*************************!*\
+  !*** external "vscode" ***!
+  \*************************/
+(module) {
+
+module.exports = require("vscode");
+
+/***/ },
+
+/***/ "child_process"
+/*!********************************!*\
+  !*** external "child_process" ***!
+  \********************************/
+(module) {
+
+module.exports = require("child_process");
+
+/***/ },
+
+/***/ "crypto"
+/*!*************************!*\
+  !*** external "crypto" ***!
+  \*************************/
+(module) {
+
+module.exports = require("crypto");
+
+/***/ },
+
+/***/ "events"
+/*!*************************!*\
+  !*** external "events" ***!
+  \*************************/
+(module) {
+
+module.exports = require("events");
+
+/***/ },
+
+/***/ "fs"
+/*!*********************!*\
+  !*** external "fs" ***!
+  \*********************/
+(module) {
+
+module.exports = require("fs");
+
+/***/ },
+
+/***/ "node:diagnostics_channel"
+/*!*******************************************!*\
+  !*** external "node:diagnostics_channel" ***!
+  \*******************************************/
+(module) {
+
+module.exports = require("node:diagnostics_channel");
+
+/***/ },
+
+/***/ "node:events"
+/*!******************************!*\
+  !*** external "node:events" ***!
+  \******************************/
+(module) {
+
+module.exports = require("node:events");
+
+/***/ },
+
+/***/ "node:fs"
+/*!**************************!*\
+  !*** external "node:fs" ***!
+  \**************************/
+(module) {
+
+module.exports = require("node:fs");
+
+/***/ },
+
+/***/ "node:fs/promises"
+/*!***********************************!*\
+  !*** external "node:fs/promises" ***!
+  \***********************************/
+(module) {
+
+module.exports = require("node:fs/promises");
+
+/***/ },
+
+/***/ "node:path"
+/*!****************************!*\
+  !*** external "node:path" ***!
+  \****************************/
+(module) {
+
+module.exports = require("node:path");
+
+/***/ },
+
+/***/ "node:stream"
+/*!******************************!*\
+  !*** external "node:stream" ***!
+  \******************************/
+(module) {
+
+module.exports = require("node:stream");
+
+/***/ },
+
+/***/ "node:string_decoder"
+/*!**************************************!*\
+  !*** external "node:string_decoder" ***!
+  \**************************************/
+(module) {
+
+module.exports = require("node:string_decoder");
+
+/***/ },
+
+/***/ "node:url"
+/*!***************************!*\
+  !*** external "node:url" ***!
+  \***************************/
+(module) {
+
+module.exports = require("node:url");
+
+/***/ },
+
+/***/ "os"
+/*!*********************!*\
+  !*** external "os" ***!
+  \*********************/
+(module) {
+
+module.exports = require("os");
+
+/***/ },
+
+/***/ "path"
+/*!***********************!*\
+  !*** external "path" ***!
+  \***********************/
+(module) {
+
+module.exports = require("path");
+
+/***/ },
+
+/***/ "./package.json"
+/*!**********************!*\
+  !*** ./package.json ***!
+  \**********************/
+(module) {
+
+module.exports = /*#__PURE__*/JSON.parse('{"name":"imde","displayName":"IMDE","description":"Ingenic MCU Development Environment — VS Code integration","version":"0.3.6","publisher":"ingenic","license":"ISC","repository":{"type":"git","url":"https://github.com/ingenic/imde"},"sideEffects":["*.scss","*.css","*.vue"],"icon":"icon.png","engines":{"vscode":"^1.85.0"},"categories":["Other"],"activationEvents":["workspaceContains:imde.json","onCommand:imde.guiConfig","onCommand:imde.pinmux","onCommand:imde.build","onCommand:imde.doctor","onCommand:imde.fullCleanBuild","onCommand:imde.viewMap","onView:imde.doctorView","onView:imde.buildView","onView:imde.artifactsView"],"main":"./dist/extension.js","contributes":{"commands":[{"command":"imde.doctor","title":"IMDE: Run Doctor","icon":"$(heart)"},{"command":"imde.build","title":"IMDE: Build","icon":"$(wrench)"},{"command":"imde.fullCleanBuild","title":"IMDE: FullClean & Build","icon":""},{"command":"imde.configure","title":"IMDE: Configure"},{"command":"imde.menuconfig","title":"IMDE: Menuconfig"},{"command":"imde.guiConfig","title":"IMDE: GUI Config","icon":"$(settings)"},{"command":"imde.pinmux","title":"IMDE: Pinmux","icon":"$(circuit-board)"},{"command":"imde.clean","title":"IMDE: Clean"},{"command":"imde.fullclean","title":"IMDE: Full Clean"},{"command":"imde.selectDefconfig","title":"IMDE: Select Defconfig","icon":"$(list-selection)"},{"command":"imde.saveDefconfig","title":"IMDE: Save Defconfig"},{"command":"imde.setupToolchain","title":"IMDE: Setup Toolchain"},{"command":"imde.status","title":"IMDE: Show Status"},{"command":"imde.artifacts","title":"IMDE: Show Artifacts"},{"command":"imde.copyPath","title":"IMDE: Copy Path","icon":"$(copy)"},{"command":"imde.revealFile","title":"IMDE: Reveal File","icon":"$(folder-opened)"},{"command":"imde.refresh","title":"IMDE: Refresh View","icon":"$(refresh)"},{"command":"imde.viewMap","title":"IMDE: View Map","icon":"$(symbol-color)"},{"command":"imde.openFile","title":"IMDE: Open Source File"},{"command":"imde.setupIntelliSense","title":"IMDE: Setup IntelliSense"}],"viewsContainers":{"activitybar":[{"id":"imde-sidebar","title":"IMDE","icon":"logo/ingenic_blue.svg"}]},"views":{"imde-sidebar":[{"id":"imde.doctorView","name":"Environment"},{"id":"imde.buildView","name":"Build & Config"},{"id":"imde.artifactsView","name":"Artifacts"}]},"menus":{"view/title":[{"command":"imde.refresh","when":"view == imde.doctorView","group":"navigation"},{"command":"imde.refresh","when":"view == imde.artifactsView","group":"navigation"},{"command":"imde.build","when":"view == imde.buildView","group":"navigation"},{"command":"imde.selectDefconfig","when":"view == imde.buildView","group":"navigation"},{"command":"imde.pinmux","when":"view == imde.buildView","group":"navigation@3"}],"view/item/context":[{"command":"imde.copyPath","when":"view == imde.artifactsView && viewItem == imdeArtifact","group":"inline"},{"command":"imde.revealFile","when":"view == imde.artifactsView && viewItem == imdeArtifact","group":"inline"},{"command":"imde.viewMap","when":"view == imde.artifactsView && viewItem == imdeMapArtifact","group":"inline@1"}]},"configuration":{"title":"IMDE","properties":{"imde.projectDir":{"type":"string","default":"","scope":"resource","description":"Override the SDK project directory. When empty, IMDE searches upward from the first workspace folder for imde.json."},"imde.terminalName":{"type":"string","default":"IMDE","description":"Terminal name used for interactive IMDE commands."},"imde.captureTimeoutMs":{"type":"number","default":15000,"minimum":1000,"description":"Timeout in milliseconds for short JSON capture commands used by IMDE views."},"imde.commandTimeoutMs":{"type":"number","default":0,"minimum":0,"description":"Timeout in milliseconds for non-interactive IMDE commands. Use 0 to disable the timeout."},"imde.showOutputOnError":{"type":"boolean","default":true,"description":"Reveal the shared IMDE terminal when a managed command fails."},"imde.guiConfig.autoHeaderPath":{"scope":"resource","type":"string","default":"","description":"Path to write the generated C header file. Leave empty to skip header generation (SDK uses CMake-generated sdk_config.h)."}}}},"scripts":{"vscode:prepublish":"webpack --mode production","compile":"webpack --mode development","check":"webpack --mode development","watch":"webpack --mode development --watch","test":"npm run test:parser && npm run test:kconfig && npm run test:diag && npm run test:intellisense && npm run test:pinmux && npm run test:board-pinmux","test:parser":"npx ts-node --project test/tsconfig.json test/parser.test.ts","test:kconfig":"npx ts-node --project test/tsconfig.json test/kconfig.test.ts","test:diag":"npx ts-node --project test/tsconfig.json test/diagnostics.test.ts","test:intellisense":"npx ts-node --project test/tsconfig.json test/intelliSense.test.ts","test:pinmux":"npx ts-node --project test/tsconfig.json test/pinmuxDiscovery.test.ts","test:board-pinmux":"npx ts-node --project test/tsconfig.json test/boardPinmuxParser.test.ts && npx ts-node --project test/tsconfig.json test/boardPinmuxGenerator.test.ts && npx ts-node --project test/tsconfig.json test/pinmuxBoardFiles.test.ts && npx ts-node --project test/tsconfig.json test/pinmuxBoardWorkspace.test.ts","package":"vsce package","package:dry":"vsce ls","publish":"vsce publish"},"devDependencies":{"@types/node":"^18.19.0","@types/vscode":"^1.85.0","@vscode/vsce":"^2.22.0","@vue/compiler-sfc":"^3.3.4","assert":"^2.0.0","css-loader":"^6.8.1","os-browserify":"^0.3.0","path-browserify":"^1.0.1","sass":"^1.64.1","sass-loader":"^13.3.2","stream-browserify":"^3.0.0","ts-loader":"^9.3.1","typescript":"^5.3.0","vue-loader":"^17.2.2","vue-style-loader":"^4.1.3","webpack":"^5.74.0","webpack-cli":"^4.10.0"},"dependencies":{"@iconify-prerendered/vue-codicon":"^0.28.1753246500","@vscode/codicons":"^0.0.35","glob":"^11.0.3","pinia":"^2.1.6","vue":"^3.3.4"}}');
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = __webpack_modules__;
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__webpack_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__webpack_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/create fake namespace object */
+/******/ 	(() => {
+/******/ 		var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
+/******/ 		var leafPrototypes;
+/******/ 		// create a fake namespace object
+/******/ 		// mode & 1: value is a module id, require it
+/******/ 		// mode & 2: merge all properties of value into the ns
+/******/ 		// mode & 4: return value when already ns object
+/******/ 		// mode & 16: return value when it's Promise-like
+/******/ 		// mode & 8|1: behave like require
+/******/ 		__webpack_require__.t = function(value, mode) {
+/******/ 			if(mode & 1) value = this(value);
+/******/ 			if(mode & 8) return value;
+/******/ 			if(typeof value === 'object' && value) {
+/******/ 				if((mode & 4) && value.__esModule) return value;
+/******/ 				if((mode & 16) && typeof value.then === 'function') return value;
+/******/ 			}
+/******/ 			var ns = Object.create(null);
+/******/ 			__webpack_require__.r(ns);
+/******/ 			var def = {};
+/******/ 			leafPrototypes = leafPrototypes || [null, getProto({}), getProto([]), getProto(getProto)];
+/******/ 			for(var current = mode & 2 && value; (typeof current == 'object' || typeof current == 'function') && !~leafPrototypes.indexOf(current); current = getProto(current)) {
+/******/ 				Object.getOwnPropertyNames(current).forEach((key) => (def[key] = () => (value[key])));
+/******/ 			}
+/******/ 			def['default'] = () => (value);
+/******/ 			__webpack_require__.d(ns, def);
+/******/ 			return ns;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/ensure chunk */
+/******/ 	(() => {
+/******/ 		__webpack_require__.f = {};
+/******/ 		// This file contains only the entry chunk.
+/******/ 		// The chunk loading function for additional chunks
+/******/ 		__webpack_require__.e = (chunkId) => {
+/******/ 			return Promise.all(Object.keys(__webpack_require__.f).reduce((promises, key) => {
+/******/ 				__webpack_require__.f[key](chunkId, promises);
+/******/ 				return promises;
+/******/ 			}, []));
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/get javascript chunk filename */
+/******/ 	(() => {
+/******/ 		// This function allow to reference async chunks
+/******/ 		__webpack_require__.u = (chunkId) => {
+/******/ 			// return url for filenames based on template
+/******/ 			return "" + chunkId + ".js";
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/require chunk loading */
+/******/ 	(() => {
+/******/ 		// no baseURI
+/******/ 		
+/******/ 		// object to store loaded chunks
+/******/ 		// "1" means "loaded", otherwise not loaded yet
+/******/ 		var installedChunks = {
+/******/ 			"extension": 1
+/******/ 		};
+/******/ 		
+/******/ 		// no on chunks loaded
+/******/ 		
+/******/ 		var installChunk = (chunk) => {
+/******/ 			var moreModules = chunk.modules, chunkIds = chunk.ids, runtime = chunk.runtime;
+/******/ 			for(var moduleId in moreModules) {
+/******/ 				if(__webpack_require__.o(moreModules, moduleId)) {
+/******/ 					__webpack_require__.m[moduleId] = moreModules[moduleId];
+/******/ 				}
+/******/ 			}
+/******/ 			if(runtime) runtime(__webpack_require__);
+/******/ 			for(var i = 0; i < chunkIds.length; i++)
+/******/ 				installedChunks[chunkIds[i]] = 1;
+/******/ 		
+/******/ 		};
+/******/ 		
+/******/ 		// require() chunk loading for javascript
+/******/ 		__webpack_require__.f.require = (chunkId, promises) => {
+/******/ 			// "1" is the signal for "already loaded"
+/******/ 			if(!installedChunks[chunkId]) {
+/******/ 				if(true) { // all chunks have JS
+/******/ 					var installedChunk = require("./" + __webpack_require__.u(chunkId));
+/******/ 					if (!installedChunks[chunkId]) {
+/******/ 						installChunk(installedChunk);
+/******/ 					}
+/******/ 				} else installedChunks[chunkId] = 1;
+/******/ 			}
+/******/ 		};
+/******/ 		
+/******/ 		// no external install chunk
+/******/ 		
+/******/ 		// no HMR
+/******/ 		
+/******/ 		// no HMR manifest
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
+(() => {
+/*!**************************!*\
+  !*** ./src/extension.ts ***!
+  \**************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   activate: () => (/* binding */ activate),
+/* harmony export */   deactivate: () => (/* binding */ deactivate)
+/* harmony export */ });
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vscode */ "vscode");
+/* harmony import */ var vscode__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vscode__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! path */ "path");
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(path__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! fs */ "fs");
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(fs__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _imdeRunner__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./imdeRunner */ "./src/imdeRunner.ts");
+/* harmony import */ var _doctorTree__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./doctorTree */ "./src/doctorTree.ts");
+/* harmony import */ var _artifactsTree__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./artifactsTree */ "./src/artifactsTree.ts");
+/* harmony import */ var _buildTree__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./buildTree */ "./src/buildTree.ts");
+/* harmony import */ var _menuconfig_fileWatcher__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./menuconfig/fileWatcher */ "./src/menuconfig/fileWatcher.ts");
+/* harmony import */ var _logger_logger__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./logger/logger */ "./src/logger/logger.ts");
+/* harmony import */ var _diagnostics__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./diagnostics */ "./src/diagnostics.ts");
+/* harmony import */ var _defconfig__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./defconfig */ "./src/defconfig.ts");
+/* harmony import */ var _intelliSense__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./intelliSense */ "./src/intelliSense.ts");
+
+
+
+
+
+
+
+
+
+
+
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const PACKAGE_JSON = __webpack_require__(/*! ../package.json */ "./package.json");
+// Cache for parsed .map files: path -> { mtime, data }.  Bounded to prevent unbounded growth.
+const mapCache = new Map();
+const MAP_CACHE_MAX = 8;
+async function getCachedMapData(filePath) {
+    const stat = await fs__WEBPACK_IMPORTED_MODULE_2__.promises.stat(filePath);
+    const cached = mapCache.get(filePath);
+    if (cached && cached.mtime === stat.mtimeMs) {
+        return cached.data;
+    }
+    const { parseMapFile } = await __webpack_require__.e(/*! import() */ "src_mapview_parser_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./mapview/parser */ "./src/mapview/parser.ts"));
+    const content = await vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.fs.readFile(vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(filePath));
+    const text = Buffer.from(content).toString("utf-8");
+    const data = parseMapFile(text);
+    if (mapCache.size >= MAP_CACHE_MAX) {
+        const first = mapCache.keys().next().value;
+        mapCache.delete(first);
+    }
+    mapCache.set(filePath, { mtime: stat.mtimeMs, data });
+    return data;
+}
+function activate(context) {
+    _logger_logger__WEBPACK_IMPORTED_MODULE_8__.Logger.info("IMDE extension is now active");
+    const runner = new _imdeRunner__WEBPACK_IMPORTED_MODULE_3__.ImdeRunner();
+    context.subscriptions.push(runner);
+    if (!runner.isValidImdeProject) {
+        _logger_logger__WEBPACK_IMPORTED_MODULE_8__.Logger.info("IMDE: imde.json not found within 10 levels — extension idle.");
+        // Register only a minimal set of commands that show guidance
+        context.subscriptions.push(vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.doctor", () => vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project. Open a workspace that contains imde.json.")), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.build", () => vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project. Open a workspace that contains imde.json.")), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.guiConfig", () => vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: not an IMDE project. Open a workspace that contains imde.json.")));
+        return;
+    }
+    _imdeRunner__WEBPACK_IMPORTED_MODULE_3__.ImdeRunner.warmupEnv();
+    // ---- Workspace folder change handling ----
+    context.subscriptions.push(vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.onDidChangeWorkspaceFolders(() => {
+        runner.resetProjectCheck();
+    }));
+    // ---- IntelliSense (auto-setup include paths / defines from CMake) ----
+    const intelliSenseSync = () => {
+        const proj = runner.getProjectDir();
+        if (!proj)
+            return null;
+        const msg = (0,_intelliSense__WEBPACK_IMPORTED_MODULE_11__.syncIntelliSense)(proj);
+        if (msg) {
+            _logger_logger__WEBPACK_IMPORTED_MODULE_8__.Logger.info(msg);
+        }
+        return msg;
+    };
+    // Run once on activation if compile_commands.json already exists
+    const intelliSenseTimer = setTimeout(intelliSenseSync, 3000);
+    context.subscriptions.push({ dispose: () => clearTimeout(intelliSenseTimer) });
+    // ---- Diagnostics (Problems panel integration) ----
+    const diagnostics = new _diagnostics__WEBPACK_IMPORTED_MODULE_9__.ImdeDiagnostics(runner.getProjectDir());
+    context.subscriptions.push(diagnostics);
+    // ---- File watcher for config changes ----
+    const fileWatcher = new _menuconfig_fileWatcher__WEBPACK_IMPORTED_MODULE_7__.FileWatcher(context);
+    fileWatcher.initialize();
+    // ---- Tree views ----
+    const doctorTree = new _doctorTree__WEBPACK_IMPORTED_MODULE_4__.DoctorTreeProvider(runner);
+    const buildTree = new _buildTree__WEBPACK_IMPORTED_MODULE_6__.BuildTreeProvider(runner);
+    const artifactsTree = new _artifactsTree__WEBPACK_IMPORTED_MODULE_5__.ArtifactsTreeProvider(runner);
+    context.subscriptions.push(vscode__WEBPACK_IMPORTED_MODULE_0__.window.registerTreeDataProvider("imde.doctorView", doctorTree), vscode__WEBPACK_IMPORTED_MODULE_0__.window.registerTreeDataProvider("imde.buildView", buildTree), vscode__WEBPACK_IMPORTED_MODULE_0__.window.registerTreeDataProvider("imde.artifactsView", artifactsTree));
+    let refreshMapStatus;
+    const refreshAll = () => {
+        runner.invalidateJsonCache();
+        doctorTree.refresh(true);
+        buildTree.refresh();
+        artifactsTree.refresh();
+        refreshMapStatus?.();
+    };
+    const refreshProjectState = (options) => {
+        runner.invalidateJsonCache();
+        if (options?.doctor) {
+            doctorTree.refresh(true);
+        }
+        buildTree.refresh();
+        artifactsTree.refresh();
+        if (options?.intelliSense) {
+            intelliSenseSync();
+        }
+        if (options?.map) {
+            refreshMapStatus?.();
+        }
+    };
+    const runAction = async (command, args, title, after) => {
+        diagnostics.clear();
+        const result = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.withProgress({ location: vscode__WEBPACK_IMPORTED_MODULE_0__.ProgressLocation.Window, title, cancellable: false }, () => runner.runCommand(command, args, { streamOutput: true }));
+        if (result.code !== 0 || result.timedOut) {
+            const count = diagnostics.report(result.stderr + "\n" + result.stdout);
+            if (count > 0) {
+                const action = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE ${command} failed with ${count} issue${count > 1 ? "s" : ""}.`, "Show Problems", "Show Terminal");
+                if (action === "Show Problems") {
+                    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.executeCommand("workbench.actions.view.problems");
+                }
+                else if (action === "Show Terminal") {
+                    runner.showCommandTerminal();
+                }
+                return; // Don't call reportResult again
+            }
+        }
+        await reportResult(runner, command, result);
+        if (result.code === 0 && !result.timedOut) {
+            after?.();
+        }
+    };
+    const runManagedAction = async (command, args, title, options) => {
+        diagnostics.clear();
+        runner.invalidateJsonCache();
+        const result = await runner.runCommand(command, args, {
+            progressTitle: title,
+            progressDetail: title,
+            streamOutput: true,
+            timeoutMs: options?.timeoutMs,
+        });
+        if (result.code !== 0 || result.timedOut) {
+            const issueCount = diagnostics.report(result.stderr + "\n" + result.stdout);
+            const reason = result.timedOut
+                ? "timed out"
+                : `failed with exit code ${result.code ?? "unknown"}`;
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.setStatusBarMessage(`$(error) IMDE ${command} ${reason}`, 5000);
+            if (vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde").get("showOutputOnError") ?? true) {
+                runner.showCommandTerminal();
+            }
+            const action = issueCount > 0
+                ? await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE ${command} ${reason} with ${issueCount} issue${issueCount > 1 ? "s" : ""}.`, "Show Problems", "Show Terminal")
+                : await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE ${command} ${reason}.`, "Show Terminal");
+            if (action === "Show Problems") {
+                vscode__WEBPACK_IMPORTED_MODULE_0__.commands.executeCommand("workbench.actions.view.problems");
+            }
+            else if (action === "Show Terminal") {
+                runner.showCommandTerminal();
+            }
+            refreshProjectState({
+                doctor: options?.refreshDoctor,
+                intelliSense: options?.syncIntelliSense,
+                map: options?.refreshMap,
+            });
+            return false;
+        }
+        refreshProjectState({
+            doctor: options?.refreshDoctor,
+            intelliSense: options?.syncIntelliSense,
+            map: options?.refreshMap,
+        });
+        if (options?.successMessage) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.setStatusBarMessage(`$(check) ${options.successMessage}`, 3000);
+        }
+        return true;
+    };
+    // ---- Commands ----
+    context.subscriptions.push(vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.openEnv", () => {
+        runner.openEnvOrRunDoctor(true);
+        pollRefresh(() => doctorTree.refresh(true), 2000, 2);
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.doctor", () => {
+        runner.runTerminal("doctor", [], { show: true });
+        pollRefresh(() => doctorTree.refresh(true), 2000, 2);
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.build", () => runManagedAction("build", [], "IMDE Build", {
+        successMessage: "Build completed",
+        refreshMap: true,
+        syncIntelliSense: true,
+    })), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.configure", () => runManagedAction("configure", [], "IMDE Configure", {
+        successMessage: "Configure completed",
+        syncIntelliSense: true,
+        refreshMap: true,
+    })), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.menuconfig", async () => {
+        const projDir = runner.getProjectDir();
+        const cmakeCache = path__WEBPACK_IMPORTED_MODULE_1__.join(projDir, "build", "CMakeCache.txt");
+        if (!fs__WEBPACK_IMPORTED_MODULE_2__.existsSync(cmakeCache)) {
+            const configured = await runManagedAction("configure", [], "IMDE Configure", {
+                successMessage: "Configure completed",
+                syncIntelliSense: true,
+                refreshMap: true,
+            });
+            if (!configured) {
+                return;
+            }
+        }
+        runner.runTerminal("menuconfig", ["--configure-if-needed"], { show: true });
+        pollRefresh(() => { buildTree.refresh(); artifactsTree.refresh(); }, 3000, 3);
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.fullCleanBuild", async () => {
+        const cleaned = await runManagedAction("fullclean", ["--yes"], "IMDE Full Clean", {
+            successMessage: "Full clean completed",
+            refreshMap: true,
+        });
+        if (!cleaned) {
+            return;
+        }
+        await runManagedAction("build", [], "IMDE Build", {
+            successMessage: "Rebuild completed",
+            syncIntelliSense: true,
+            refreshMap: true,
+        });
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.clean", () => runManagedAction("clean", [], "IMDE Clean", {
+        successMessage: "Clean completed",
+        refreshMap: true,
+    })), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.fullclean", async () => {
+        const ans = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("Delete the entire IMDE build directory? This cannot be undone.", { modal: true }, "Delete");
+        if (ans === "Delete") {
+            await runManagedAction("fullclean", ["--yes"], "IMDE Full Clean", {
+                successMessage: "Full clean completed",
+                refreshMap: true,
+            });
+        }
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.status", async () => runAction("status", [], "Reading IMDE status", buildTree.refresh.bind(buildTree))), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.artifacts", async () => runAction("artifacts", [], "Reading IMDE artifacts", artifactsTree.refresh.bind(artifactsTree))), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.setupToolchain", async () => runAction("setup-toolchain", [], "Setting up IMDE toolchain", refreshAll)), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.selectDefconfig", () => (0,_defconfig__WEBPACK_IMPORTED_MODULE_10__.selectDefconfig)(runner, context, () => {
+        refreshProjectState({ intelliSense: true, map: true });
+    })), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.saveDefconfig", async () => {
+        await (0,_defconfig__WEBPACK_IMPORTED_MODULE_10__.saveDefconfig)(runner);
+        refreshProjectState({ map: true });
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.copyPath", async (itemOrPath) => {
+        const filePath = typeof itemOrPath === "string" ? itemOrPath : itemOrPath.artifactPath;
+        await vscode__WEBPACK_IMPORTED_MODULE_0__.env.clipboard.writeText(filePath);
+        vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInformationMessage("Path copied");
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.revealFile", async (itemOrPath) => {
+        const filePath = typeof itemOrPath === "string" ? itemOrPath : itemOrPath.artifactPath;
+        await vscode__WEBPACK_IMPORTED_MODULE_0__.commands.executeCommand("revealFileInOS", vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(filePath));
+    }), vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.refresh", refreshAll), 
+    // Used by Map View webview to open source files from tooltip links
+    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.openFile", async (args) => {
+        // Accept single path or [fullPath, relativePath] tuple
+        const fullPath = Array.isArray(args) ? args[0] : args;
+        const relPath = Array.isArray(args) ? args[1] : "";
+        const uri = vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(fullPath);
+        if (fs__WEBPACK_IMPORTED_MODULE_2__.existsSync(fullPath)) {
+            await vscode__WEBPACK_IMPORTED_MODULE_0__.commands.executeCommand("vscode.open", uri);
+            return;
+        }
+        // Fallback: fuzzy search in workspace for the relative source file
+        if (relPath) {
+            const results = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.withProgress({ location: vscode__WEBPACK_IMPORTED_MODULE_0__.ProgressLocation.Window, title: "Searching source file…" }, () => vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.findFiles("**/" + relPath.replace(/\\/g, "/"), null, 1));
+            if (results.length > 0) {
+                await vscode__WEBPACK_IMPORTED_MODULE_0__.commands.executeCommand("vscode.open", results[0]);
+                return;
+            }
+        }
+        vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("Source file not found: " + (relPath || fullPath));
+    }), 
+    // ---- Pinmux ----
+    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.pinmux", async () => {
+        const projectDir = runner.getProjectDir();
+        try {
+            const [{ discoverPinmuxTargets }, { loadPinmuxFile }, { loadBoardPinmuxFile }, { generateBoardPinmuxSource, generateBoardPinsHeader }, { createPinmuxBoard, deletePinmuxBoard, validateBoardId }, { PinmuxPanel }] = await Promise.all([
+                __webpack_require__.e(/*! import() */ "src_pinmux_discovery_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/discovery */ "./src/pinmux/discovery.ts")),
+                __webpack_require__.e(/*! import() */ "src_pinmux_parser_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/parser */ "./src/pinmux/parser.ts")),
+                __webpack_require__.e(/*! import() */ "src_pinmux_boardParser_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/boardParser */ "./src/pinmux/boardParser.ts")),
+                __webpack_require__.e(/*! import() */ "src_pinmux_boardGenerator_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/boardGenerator */ "./src/pinmux/boardGenerator.ts")),
+                __webpack_require__.e(/*! import() */ "src_pinmux_boardWorkspace_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/boardWorkspace */ "./src/pinmux/boardWorkspace.ts")),
+                Promise.all(/*! import() */[__webpack_require__.e("src_pinmux_boardWorkspace_ts"), __webpack_require__.e("src_pinmux_boardParser_ts"), __webpack_require__.e("src_pinmux_panel_ts")]).then(__webpack_require__.bind(__webpack_require__, /*! ./pinmux/panel */ "./src/pinmux/panel.ts")),
+            ]);
+            const chips = await discoverPinmuxTargets(projectDir);
+            if (chips.length === 0) {
+                vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: no BSP chips with board_pinmux.c were found.");
+                return;
+            }
+            const chipItem = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showQuickPick(chips.map(chip => ({ label: chip.id, description: `${chip.boards.length} board${chip.boards.length === 1 ? "" : "s"}`, chip })), { placeHolder: "Select a chip" });
+            if (!chipItem)
+                return;
+            const boardChoices = [
+                ...chipItem.chip.boards.map(board => ({ label: board.id, description: path__WEBPACK_IMPORTED_MODULE_1__.relative(projectDir, board.pinmuxFile), board, action: "open" })),
+                { label: "$(add) Create blank BSP...", description: "Start this chip with no selected pins", action: "create" },
+                ...(chipItem.chip.boards.length > 0
+                    ? [{ label: "$(trash) Delete BSP...", description: "Remove a board and its CMake/Kconfig registration", action: "delete" }]
+                    : []),
+            ];
+            const boardItem = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showQuickPick(boardChoices, { placeHolder: `Select a ${chipItem.chip.id} board` });
+            if (!boardItem)
+                return;
+            if (boardItem.action === "delete") {
+                const deleteItem = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showQuickPick(chipItem.chip.boards.map(board => ({
+                    label: board.id,
+                    description: path__WEBPACK_IMPORTED_MODULE_1__.relative(projectDir, board.directory),
+                    board,
+                })), { placeHolder: `Select a ${chipItem.chip.id} BSP to delete` });
+                if (!deleteItem)
+                    return;
+                if (PinmuxPanel.isShowingBoard(chipItem.chip.id, deleteItem.board.id)) {
+                    vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage(`Close the ${chipItem.chip.id}/${deleteItem.board.id} Pinmux panel before deleting its BSP.`);
+                    return;
+                }
+                const boardDirectory = path__WEBPACK_IMPORTED_MODULE_1__.resolve(deleteItem.board.directory);
+                const dirtyDocument = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.textDocuments.find(document => {
+                    if (!document.isDirty || document.uri.scheme !== "file")
+                        return false;
+                    const relative = path__WEBPACK_IMPORTED_MODULE_1__.relative(boardDirectory, path__WEBPACK_IMPORTED_MODULE_1__.resolve(document.uri.fsPath));
+                    return relative === "" || (!relative.startsWith("..") && !path__WEBPACK_IMPORTED_MODULE_1__.isAbsolute(relative));
+                });
+                if (dirtyDocument) {
+                    vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage(`Save or close ${path__WEBPACK_IMPORTED_MODULE_1__.basename(dirtyDocument.uri.fsPath)} before deleting ${deleteItem.board.id}.`);
+                    return;
+                }
+                const confirmed = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage(`Delete BSP ${chipItem.chip.id}/${deleteItem.board.id}?`, {
+                    modal: true,
+                    detail: `IMDE will permanently remove ${path__WEBPACK_IMPORTED_MODULE_1__.relative(projectDir, boardDirectory)} and update the chip CMakeLists.txt and Kconfig registrations.`,
+                }, "Delete BSP");
+                if (confirmed !== "Delete BSP")
+                    return;
+                const deleted = await deletePinmuxBoard({
+                    boardId: deleteItem.board.id,
+                    chipId: chipItem.chip.id,
+                    chipDirectory: chipItem.chip.directory,
+                });
+                vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInformationMessage(`IMDE: deleted ${chipItem.chip.id}/${deleted.boardId} and updated board integration.`);
+                refreshProjectState({ map: true });
+                return;
+            }
+            if (chipItem.chip.pinlistFiles.length === 0) {
+                throw new Error(`No .impx pinlist found for ${chipItem.chip.id}.`);
+            }
+            let pinlistFile = chipItem.chip.pinlistFiles[0];
+            if (chipItem.chip.pinlistFiles.length > 1) {
+                const pinlistItem = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showQuickPick(chipItem.chip.pinlistFiles.map(filePath => ({ label: path__WEBPACK_IMPORTED_MODULE_1__.basename(filePath), description: path__WEBPACK_IMPORTED_MODULE_1__.relative(projectDir, filePath), filePath })), { placeHolder: `Select a ${chipItem.chip.id} package` });
+                if (!pinlistItem)
+                    return;
+                pinlistFile = pinlistItem.filePath;
+            }
+            const { definition, filePath } = await loadPinmuxFile(pinlistFile);
+            if (boardItem.action === "create") {
+                const boardId = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInputBox({
+                    prompt: `Create a blank ${chipItem.chip.id} BSP`,
+                    placeHolder: "pd_lock",
+                    validateInput: value => validateBoardId(value.trim()),
+                });
+                if (!boardId)
+                    return;
+                const normalizedBoardId = boardId.trim();
+                const pinmuxSource = generateBoardPinmuxSource(definition, chipItem.chip.id, normalizedBoardId, [], {
+                    mode: "persisted",
+                    allowEmpty: true,
+                });
+                const boardPinsSource = generateBoardPinsHeader(chipItem.chip.id, normalizedBoardId, []);
+                const confirmed = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage(`Create blank BSP ${chipItem.chip.id}/${normalizedBoardId}?`, {
+                    modal: true,
+                    detail: "IMDE will create an empty board_pinmux.c and board_pins.h, plus the board CMake/Kconfig files. Existing boards are not copied.",
+                }, "Create Board");
+                if (confirmed !== "Create Board")
+                    return;
+                const created = await createPinmuxBoard({
+                    boardId: normalizedBoardId,
+                    chipId: chipItem.chip.id,
+                    chipDirectory: chipItem.chip.directory,
+                    pinmuxSource,
+                    boardPinsSource,
+                });
+                const boardPinmux = await loadBoardPinmuxFile(created.pinmuxFile, definition);
+                PinmuxPanel.createOrShow(context, definition, filePath, chipItem.chip.id, created.boardId, boardPinmux);
+                return;
+            }
+            const boardPinmux = await loadBoardPinmuxFile(boardItem.board.pinmuxFile, definition);
+            PinmuxPanel.createOrShow(context, definition, filePath, chipItem.chip.id, boardItem.board.id, boardPinmux);
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE: Pinmux operation failed. ${message}`);
+        }
+    }), 
+    // ---- Map View ----
+    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.viewMap", async (item) => {
+        let filePath;
+        if (typeof item === "string") {
+            filePath = item;
+        }
+        else if (item?.artifactPath) {
+            filePath = item.artifactPath;
+        }
+        else {
+            // Find .map artifact automatically
+            const data = await runner.captureJson("artifacts");
+            if (data?.artifacts) {
+                const maps = Object.entries(data.artifacts)
+                    .filter(([k, v]) => k.endsWith(".map") && v.exists)
+                    .map(([k, v]) => ({ label: k, path: v.path }));
+                if (maps.length === 1) {
+                    filePath = maps[0].path;
+                }
+                else if (maps.length > 1) {
+                    const picked = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showQuickPick(maps, { placeHolder: "Select a .map file to view" });
+                    filePath = picked?.path;
+                }
+            }
+            if (!filePath) {
+                vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("No .map artifact found. Build first?");
+                return;
+            }
+        }
+        try {
+            const mapData = await getCachedMapData(filePath);
+            const { MapViewPanel } = await __webpack_require__.e(/*! import() */ "src_mapview_panel_ts").then(__webpack_require__.bind(__webpack_require__, /*! ./mapview/panel */ "./src/mapview/panel.ts"));
+            MapViewPanel.createOrShow(context.extensionUri, filePath, mapData, runner.getProjectDir());
+        }
+        catch (err) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`Failed to parse map file: ${err.message}`);
+        }
+    }), 
+    // ---- GUI Config (Visual Kconfig Editor) ----
+    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.guiConfig", async (uri) => {
+        const workspaceFolder = uri
+            ? vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getWorkspaceFolder(uri)
+            : vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage("Please open a workspace folder first.");
+            return;
+        }
+        // Check .config exists
+        const projDir = workspaceFolder.uri.fsPath;
+        const configPath = path__WEBPACK_IMPORTED_MODULE_1__.join(projDir, ".config");
+        if (!fs__WEBPACK_IMPORTED_MODULE_2__.existsSync(configPath)) {
+            const action = await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("No .config found. Select a defconfig to generate one.", "Select Defconfig");
+            if (action === "Select Defconfig") {
+                await (0,_defconfig__WEBPACK_IMPORTED_MODULE_10__.selectDefconfig)(runner, context);
+            }
+            return;
+        }
+        // .config exists but build directory may have been cleaned — auto-configure
+        const cmakeCache = path__WEBPACK_IMPORTED_MODULE_1__.join(projDir, "build", "CMakeCache.txt");
+        if (!fs__WEBPACK_IMPORTED_MODULE_2__.existsSync(cmakeCache)) {
+            const configured = await runManagedAction("configure", [], "IMDE Configure", {
+                successMessage: "Configure completed",
+                syncIntelliSense: true,
+                refreshMap: true,
+            });
+            if (!configured) {
+                return;
+            }
+        }
+        try {
+            const { MenuconfigPanel } = await Promise.all(/*! import() */[__webpack_require__.e("vendors-node_modules_glob_dist_esm_index_js"), __webpack_require__.e("src_menuconfig_MenuconfigPanel_ts")]).then(__webpack_require__.bind(__webpack_require__, /*! ./menuconfig/MenuconfigPanel */ "./src/menuconfig/MenuconfigPanel.ts"));
+            MenuconfigPanel.createOrShow(context.extensionUri, workspaceFolder.uri, context);
+        }
+        catch (error) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`Failed to open IMDE GUI Config: ${error.message}`);
+        }
+    }), 
+    // ---- IntelliSense ----
+    vscode__WEBPACK_IMPORTED_MODULE_0__.commands.registerCommand("imde.setupIntelliSense", () => {
+        runner.invalidateJsonCache();
+        const msg = intelliSenseSync();
+        if (msg) {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showInformationMessage(msg);
+        }
+        else {
+            vscode__WEBPACK_IMPORTED_MODULE_0__.window.showWarningMessage("IMDE: compile_commands.json not found. Run `imde configure` first.");
+        }
+    }));
+    // ---- Status bar quick actions ----
+    // Polling helper: refresh after terminal commands complete
+    const pollRefresh = (fn, delay = 3000, retries = 3) => {
+        let count = 0;
+        const attempt = () => {
+            fn();
+            if (++count < retries)
+                setTimeout(attempt, delay);
+        };
+        setTimeout(attempt, delay);
+    };
+    const mkBar = (text, cmd, tooltip, priority) => {
+        const item = vscode__WEBPACK_IMPORTED_MODULE_0__.window.createStatusBarItem(vscode__WEBPACK_IMPORTED_MODULE_0__.StatusBarAlignment.Left, priority);
+        item.command = cmd;
+        item.text = text;
+        item.tooltip = tooltip;
+        item.show();
+        return item;
+    };
+    const mapBar = mkBar("$(symbol-color) Map", "imde.viewMap", "View Memory Map", 95);
+    const artifactsDirectory = path__WEBPACK_IMPORTED_MODULE_1__.join(runner.getProjectDir(), "build", "artifacts");
+    async function updateMapBarVisibility() {
+        try {
+            const entries = await fs__WEBPACK_IMPORTED_MODULE_2__.promises.readdir(artifactsDirectory, { withFileTypes: true });
+            const hasMap = entries.some(entry => entry.isFile() && entry.name.toLowerCase().endsWith(".map"));
+            if (hasMap) {
+                mapBar.show();
+            }
+            else {
+                mapBar.hide();
+            }
+        }
+        catch {
+            mapBar.hide();
+        }
+    }
+    refreshMapStatus = () => { void updateMapBarVisibility(); };
+    const mapWatcher = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.createFileSystemWatcher(new vscode__WEBPACK_IMPORTED_MODULE_0__.RelativePattern(vscode__WEBPACK_IMPORTED_MODULE_0__.Uri.file(runner.getProjectDir()), "build/artifacts/**/*.map"));
+    const refreshMapBar = () => { void updateMapBarVisibility(); };
+    mapWatcher.onDidCreate(refreshMapBar);
+    mapWatcher.onDidChange(refreshMapBar);
+    mapWatcher.onDidDelete(refreshMapBar);
+    context.subscriptions.push(mapWatcher);
+    const initialMapTimer = setTimeout(updateMapBarVisibility, 2000);
+    context.subscriptions.push({ dispose: () => clearTimeout(initialMapTimer) });
+    context.subscriptions.push(mkBar(`$(terminal-bash) IMDE ${PACKAGE_JSON.version || ""}`.trim(), "imde.openEnv", "Open IMDE terminal and source environment", 100), mkBar("$(debug-rerun) Rebuild", "imde.fullCleanBuild", "FullClean & Build", 99), mkBar("$(play) Build", "imde.build", "Build", 98), mkBar("$(list-selection) Select", "imde.selectDefconfig", "Select Defconfig", 97), mkBar("$(circuit-board) Pinmux", "imde.pinmux", "Open Pinmux", 96.5), mkBar("$(settings) Config", "imde.guiConfig", "GUI Config", 96), mapBar);
+}
+async function reportResult(runner, command, result) {
+    if (result.code === 0 && !result.timedOut) {
+        return;
+    }
+    const reason = result.timedOut ? "timed out" : `failed with exit code ${result.code ?? "unknown"}`;
+    const action = vscode__WEBPACK_IMPORTED_MODULE_0__.workspace.getConfiguration("imde").get("showOutputOnError") ?? true
+        ? await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE ${command} ${reason}.`, "Show Terminal")
+        : await vscode__WEBPACK_IMPORTED_MODULE_0__.window.showErrorMessage(`IMDE ${command} ${reason}.`);
+    if (action === "Show Terminal") {
+        runner.showCommandTerminal();
+    }
+}
+function deactivate() {
+    _logger_logger__WEBPACK_IMPORTED_MODULE_8__.Logger.info("IMDE extension is now deactivated");
+}
+
+})();
+
+module.exports = __webpack_exports__;
+/******/ })()
+;
+//# sourceMappingURL=extension.js.map

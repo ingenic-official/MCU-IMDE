@@ -21,6 +21,9 @@ export enum menuType {
   comment = "comment",
 }
 
+/** Union type for all possible Kconfig config values. */
+export type MenuValue = string | number | boolean | null | undefined;
+
 export interface Menu {
   children: Menu[];
   help: string;
@@ -31,7 +34,7 @@ export interface Menu {
   type: menuType;
   isVisible: boolean;
   isCollapsed: boolean;
-  value: any;
+  value: MenuValue;
   dependsOn: string;
   isMenuconfig: boolean;
   // Kconfig visibility - true if this config has a prompt (can be shown to user)
@@ -44,7 +47,7 @@ export interface Menu {
   isReadonly?: boolean;       // Whether this item is readonly due to being selected by others
   readonlyReason?: string;    // Explanation of why this item is readonly
   autoSelectedValue?: boolean; // Whether the current value was set automatically by select statements
-  autoSelectedPreviousValue?: boolean | string | number; // 记录被自动选择前的原始值
+  autoSelectedPreviousValue?: MenuValue; // 记录被自动选择前的原始值
   autoSelectedPreviousWasDefault?: boolean; // 记录原值是否来自 default
   isDefaultValue?: boolean;    // Whether current值来自 default 语义（用于后续重算）
   // Source file tracking
@@ -58,7 +61,7 @@ export interface Menu {
   isImplicitContainer?: boolean; // True for configs that have no prompt but have visible children (like RT_USING_USER_MAIN)
   isContainerVisible?: boolean; // True if this item should act as a visible container for its children (even if the item itself is not visible)
   // Conditional default values
-  defaults?: Array<{ value: any; condition?: string }>; // List of default values with optional conditions
+  defaults?: Array<{ value: MenuValue; condition?: string }>; // List of default values with optional conditions
   optionEnvVar?: string | null;
   optionDefconfigList?: boolean;
   optionModules?: boolean;
@@ -66,7 +69,7 @@ export interface Menu {
   implyConditions?: { [target: string]: string };
   autoImpliedValue?: 'y' | 'm' | boolean;
   allowedTristateValues?: Array<'n' | 'm' | 'y'>;
-  
+
   // Main menu marker
   isMainMenu?: boolean;        // True when this menu represents the top-level mainmenu container
 
@@ -75,6 +78,8 @@ export interface Menu {
   menuPath?: string;            // Full menu path (e.g., "(Top) -> RT-Thread Kernel")
   directDepValue?: string;      // Evaluated value of direct dependencies (e.g., "=y")
   directDepExpr?: string;       // Direct dependency expression in readable format
+  effectiveDepExpr?: string;     // Full effective visibility expression after inherited menu/if conditions
+  effectiveDepValue?: string;    // Evaluated value of effective visibility expression
   prompt?: string;              // Prompt text (usually same as title, but kept for compatibility)
   selectInfo?: string;          // Information about what this symbol selects
   selectedByInfo?: string;      // Information about what selects this symbol

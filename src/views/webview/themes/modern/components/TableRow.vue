@@ -83,8 +83,23 @@ const helpIndentStyle = computed(() => ({
 }));
 
 const hasHelp = computed(() => {
-  // Always show detail toggle for config items (not menus/comments)
-  return !isMenuRow.value && !isCommentRow.value;
+  // Only show ? when there's meaningful detail to display
+  if (isMenuRow.value || isCommentRow.value) return false;
+  const item = props.row.item as any;
+  return !!(
+    item.help ||
+    item.prompt ||
+    item.directDepExpr ||
+    item.effectiveDepExpr ||
+    item.dependsOn ||
+    item.menuPath ||
+    (item.sourceFile && item.linenr) ||
+    (item.range && item.range.length >= 2) ||
+    (item.defaults && item.defaults.length > 0) ||
+    (item.select && item.select.length > 0) ||
+    (item.selectedBy && item.selectedBy.length > 0) ||
+    (item.implies && item.implies.length > 0)
+  );
 });
 
 const helpVisible = ref(false);
@@ -184,6 +199,23 @@ const { choiceSelectRef, choiceSelectWidth } = useChoiceWidth(isChoiceRow, compu
 
 const rangeMin = computed(() => props.row.item.range?.[0]);
 const rangeMax = computed(() => props.row.item.range?.[1]);
+const hasRange = computed(() => rangeMin.value !== undefined && rangeMax.value !== undefined);
+const rangeText = computed(() => {
+  if (!hasRange.value) {
+    return "";
+  }
+  if (isHexRow.value) {
+    return `${formatHexNumber(rangeMin.value)} .. ${formatHexNumber(rangeMax.value)}`;
+  }
+  return `${rangeMin.value} .. ${rangeMax.value}`;
+});
+const defaultRows = computed(() => {
+  const defaults = props.row.item.defaults || [];
+  return defaults.map((entry: { value: unknown; condition?: string }) => ({
+    value: formatDisplayValue(entry.value),
+    condition: entry.condition || "",
+  }));
+});
 
 onUnmounted(() => {
   if (valueFlashTimer) {
@@ -194,6 +226,9 @@ onUnmounted(() => {
 
 function toggleHelp() {
   helpVisible.value = !helpVisible.value;
+  if (helpVisible.value) {
+    store.requestMenuDetail(props.row.item.id || props.row.id);
+  }
 }
 
 function toggleMenu() {
@@ -471,6 +506,25 @@ function toNumericHex(value: string): number {
   const parsed = parseInt(normalized, 16);
   return Number.isNaN(parsed) ? NaN : parsed;
 }
+
+function formatHexNumber(value: unknown): string {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return String(value ?? "");
+  }
+  const sign = parsed < 0 ? "-" : "";
+  return `${sign}0x${Math.abs(parsed).toString(16)}`;
+}
+
+function formatDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "(empty)";
+  }
+  if (typeof value === "boolean") {
+    return value ? "y" : "n";
+  }
+  return String(value);
+}
 </script>
 
 <template>
@@ -633,11 +687,26 @@ function toNumericHex(value: string): number {
     <p><strong>Name:</strong> {{ props.row.item.name }}</p>
     <p v-if="props.row.item.prompt"><strong>Prompt:</strong> {{ props.row.item.prompt }}</p>
     <p><strong>Type:</strong> {{ props.row.item.type }}</p>
-    <p v-if="props.row.item.directDepExpr"><strong>Depends on:</strong> {{ props.row.item.directDepExpr }}</p>
+    <p v-if="hasRange"><strong>Range:</strong> {{ rangeText }}</p>
+    <p v-if="props.row.item.directDepExpr"><strong>Direct depends on:</strong> {{ props.row.item.directDepExpr }}</p>
+    <p v-if="props.row.item.directDepValue"><strong>Direct dependency state:</strong> {{ props.row.item.directDepValue }}</p>
+    <p v-if="props.row.item.effectiveDepExpr"><strong>Effective visibility:</strong> {{ props.row.item.effectiveDepExpr }}</p>
+    <p v-if="props.row.item.effectiveDepValue"><strong>Effective state:</strong> {{ props.row.item.effectiveDepValue }}</p>
     <p v-if="props.row.item.menuPath"><strong>Menu path:</strong> {{ props.row.item.menuPath }}</p>
     <p v-if="props.row.item.sourceFile && props.row.item.linenr">
       <strong>Location:</strong> {{ props.row.item.sourceFile }}:{{ props.row.item.linenr }}
     </p>
+    <div v-if="defaultRows.length" class="help-section">
+      <strong>Defaults:</strong>
+      <ul>
+        <li v-for="(entry, index) in defaultRows" :key="index">
+          {{ entry.value }}<span v-if="entry.condition"> if {{ entry.condition }}</span>
+        </li>
+      </ul>
+    </div>
+    <p v-if="props.row.item.selectInfo"><strong>Selects:</strong> {{ props.row.item.selectInfo }}</p>
+    <p v-if="props.row.item.selectedByInfo"><strong>Selected by:</strong> {{ props.row.item.selectedByInfo }}</p>
+    <p v-if="props.row.item.implyInfo"><strong>Implies:</strong> {{ props.row.item.implyInfo }}</p>
     <div v-if="props.row.item.help" class="help-content" v-html="props.row.item.help"></div>
     <div v-if="props.row.item.sourceFiles && props.row.item.sourceFiles.length">
       <strong>Includes:</strong>

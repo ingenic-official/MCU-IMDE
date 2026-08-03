@@ -189,7 +189,6 @@ export class MenuNode {
      */
     printTree(indent: number = 0): void {
         const _prefix = '  '.repeat(indent);
-        // Logger.debugParser(`${prefix}${this.toString()}`);
         
         let child = this.list;
         while (child) {

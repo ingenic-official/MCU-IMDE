@@ -97,6 +97,7 @@ export class MapViewPanel {
 <div class="treemap-wrap" id="treemap"></div>
 <div class="section-list" id="sectionList"></div>
 <div class="legend" id="legend"></div>
+<div class="insights" id="insights"></div>
 <div class="tooltip" id="tooltip"></div>
 <div class="ctx-menu" id="ctxMenu" style="display:none"><div class="ctx-item" onclick="ctxCopyName()">📋 Copy Name</div><div class="ctx-item" onclick="ctxCopyPath()">📁 Copy Path</div><div class="ctx-item" onclick="ctxRevealSource()">📄 Reveal Source</div></div>
 <div class="error-msg" id="errmsg"></div>
@@ -295,6 +296,7 @@ export class MapViewPanel {
       wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:' + "${muted}" + ';font-size:14px;">' +
         (searchQuery ? "No matching modules" : "No data") + '</div>';
       document.getElementById("legend").innerHTML = "";
+      document.getElementById("insights").innerHTML = "";
       return;
     }
 
@@ -376,6 +378,7 @@ export class MapViewPanel {
 
     // Legend
     renderLegend(nodes, total);
+    renderInsights(nodes, total);
   }
 
   function renderLegend(nodes, total) {
@@ -387,6 +390,35 @@ export class MapViewPanel {
         esc(top[i].name) + ' <b>' + pct(top[i].size || 0, total) + '</b></span></div>';
     }
     document.getElementById("legend").innerHTML = html;
+  }
+
+  function renderInsights(nodes, total) {
+    var el = document.getElementById("insights");
+    if (!el) return;
+
+    var source = nodes.slice().sort(function(a, b) { return (b.size || 0) - (a.size || 0); });
+    var top = source.slice(0, 5);
+    var rom = 0, ram = 0;
+    for (var i = 0; i < source.length; i++) {
+      rom += source[i].romSize || 0;
+      ram += source[i].ramSize || 0;
+    }
+
+    var html = '<div class="insight-card"><div class="insight-title">Current View</div>' +
+      '<div class="insight-row"><span class="insight-name">Visible total</span><span class="insight-size">' + fmt(total) + '</span><span class="insight-pct">' + source.length + ' nodes</span></div>' +
+      '<div class="insight-row"><span class="insight-name">ROM contribution</span><span class="insight-size">' + fmt(rom) + '</span><span class="insight-pct">' + pct(rom, total) + '</span></div>' +
+      '<div class="insight-row"><span class="insight-name">RAM contribution</span><span class="insight-size">' + fmt(ram) + '</span><span class="insight-pct">' + pct(ram, total) + '</span></div>' +
+      '</div>';
+
+    html += '<div class="insight-card"><div class="insight-title">Top Modules</div>';
+    for (var j = 0; j < top.length; j++) {
+      var n = top[j];
+      var p = total > 0 ? Math.max(0.5, ((n.size || 0) / total) * 100) : 0;
+      html += '<div class="insight-row"><span class="insight-name" title="' + esc(n.fullPath || n.name) + '">' + esc(n.name) + '</span><span class="insight-size">' + fmt(n.size || 0) + '</span><span class="insight-pct">' + pct(n.size || 0, total) + '</span></div>' +
+        '<div class="mini-bar"><div class="mini-fill" style="width:' + p.toFixed(1) + '%"></div></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
   }
 
   // --- Section list ---
@@ -452,6 +484,8 @@ export class MapViewPanel {
       this.classList.add("active");
       currentView = this.dataset.view;
       document.getElementById("treemap").style.display = currentView === "treemap" ? "block" : "none";
+      document.getElementById("legend").style.display = currentView === "treemap" ? "flex" : "none";
+      document.getElementById("insights").style.display = currentView === "treemap" ? "flex" : "none";
       var sl = document.getElementById("sectionList");
       if (currentView === "sections") { sl.classList.add("active"); } else { sl.classList.remove("active"); }
       if (currentView === "treemap") renderTreemap();

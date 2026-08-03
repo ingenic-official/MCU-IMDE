@@ -22,8 +22,7 @@ import { Logger } from "../logger/logger";
 import { VisibilityManager } from "./VisibilityManager";
 import { formatHelpText } from "./helpTextFormatter";
 import { ConcurrentFileProcessor } from "./ConcurrentFileProcessor";
-// import { DependencyScanner } from "./DependencyScanner";
-// import * as vscode from "vscode";
+import { parseKconfigNumber } from "./MenuValueUtils";
 
 export interface KconfigParserOptions {
     workspaceFolder: string;
@@ -267,6 +266,11 @@ export class KconfigParser {
                 }
                 if (line.startsWith('depends on ')) {
                     const dep = line.substring('depends on '.length).trim();
+                    if (parent.explicit_dep) {
+                        parent.explicit_dep = this.andExpr(parent.explicit_dep, dep);
+                    } else {
+                        parent.explicit_dep = dep;
+                    }
                     if (parent.dep) {
                         parent.dep = this.andExpr(parent.dep, dep);
                     } else {
@@ -276,6 +280,7 @@ export class KconfigParser {
                     if (parent.item) {
                         const combined = this.andExpr(parent.dep, parent.visibility || undefined) || parent.dep || '';
                         parent.item.dependsOn = combined;
+                        parent.item.directDepExpr = parent.explicit_dep || dep;
                     }
                     i++;
                     continue;
@@ -397,41 +402,7 @@ export class KconfigParser {
             // Handle source/rsource/osource/orsource directives
             if (line.startsWith('source ') || line.startsWith('rsource ') ||
                 line.startsWith('osource ') || line.startsWith('orsource ')) {
-                const sourceResult = await this.parseSource(line, currentFile);
-                if (sourceResult) {
-                    const sourceFiles = this.deduplicateSourceFiles(sourceResult.files);
-                    await this.preloadSourceFiles(sourceFiles, line);
-                    for (const sourceFile of sourceFiles) {
-                        const normalizedSource = path.normalize(sourceFile);
-                        if (this.activeParsingFiles.has(normalizedSource)) {
-                            Logger.warn(`Detected recursive source include, skipping: ${normalizedSource}`);
-                            continue;
-                        }
-                        this.fileOpenCounter++;
-                        this.openedFilesList.push({
-                            index: this.fileOpenCounter,
-                            file: normalizedSource,
-                            directive: line,
-                            time: new Date(),
-                        });
-                        this.allParsedFiles.add(normalizedSource);
-                        const sourceLines = await this.readFile(normalizedSource);
-                        if (sourceLines.length === 0) {
-                            if (!sourceResult.optional) {
-                                Logger.warn(`Source file not found or empty: ${normalizedSource}`);
-                            }
-                            continue;
-                        }
-                        this.activeParsingFiles.add(normalizedSource);
-                        try {
-                            await this.parseLines(sourceLines, parent, normalizedSource);
-                        } finally {
-                            this.activeParsingFiles.delete(normalizedSource);
-                        }
-                    }
-                } else {
-                    Logger.warn(`Source directive failed: ${line}`);
-                }
+                await this.parseSourceIntoParent(line, currentFile, parent);
                 i++;
                 continue;
             }
@@ -529,19 +500,15 @@ export class KconfigParser {
                 menu.type = typeKeyword as menuType;
 
                 if (rest) {
-                    const promptMatch = rest.match(/"([^"]+)"/);
-                    if (promptMatch) {
-                        menu.title = promptMatch[1];
-                        const firstQuote = rest.indexOf('"');
-                        const secondQuote = rest.indexOf('"', firstQuote + 1);
+                    const promptToken = this.extractQuotedToken(rest);
+                    if (promptToken) {
+                        menu.title = promptToken.value;
                         let cond = 'y';
-                        if (secondQuote !== -1) {
-                            const after = rest.substring(secondQuote + 1).trim();
-                            if (after.startsWith('if ')) {
-                                cond = after.substring(3).trim();
-                            }
+                        const after = rest.substring(promptToken.end).trim();
+                        if (after.startsWith('if ')) {
+                            cond = after.substring(3).trim();
                         }
-                        node.prompt = [promptMatch[1], cond];
+                        node.prompt = [promptToken.value, cond];
                         hasPrompt = true;
                     }
                 }
@@ -565,21 +532,19 @@ export class KconfigParser {
                     node.dep = dep;
                 }
                 menu.dependsOn = node.dep;
+                menu.directDepExpr = node.explicit_dep || dep;
             }
 
             const defBoolMatch = line.match(/^def_bool\s+(.+)$/);
             if (defBoolMatch) {
                 const defLine = defBoolMatch[1].trim();
-                const ifIndex = defLine.indexOf(' if ');
-                let defaultValue: string;
-                let condition: string | undefined;
+                const split = this.splitValueAndCondition(defLine);
+                let defaultValue = split.value;
+                const condition = split.condition;
 
-                if (ifIndex > -1) {
-                    defaultValue = defLine.substring(0, ifIndex).trim();
-                    condition = defLine.substring(ifIndex + 4).trim();
+                if (condition) {
                     Logger.debugParser(`[DEFAULT_PARSER] ${_configName} -> def_bool "${defaultValue}" if ${condition}`);
                 } else {
-                    defaultValue = defLine.trim();
                     Logger.debugParser(`[DEFAULT_PARSER] ${_configName} -> def_bool "${defaultValue}"`);
                 }
 
@@ -597,16 +562,13 @@ export class KconfigParser {
             // Parse default value (support: default VALUE [if CONDITION])
             if (line.startsWith('default ')) {
                 const defaultLine = line.substring(8).trim();
-                const ifIndex = defaultLine.indexOf(' if ');
-                let defaultValue: string;
-                let condition: string | undefined;
+                const split = this.splitValueAndCondition(defaultLine);
+                let defaultValue = split.value;
+                const condition = split.condition;
 
-                if (ifIndex > -1) {
-                    defaultValue = defaultLine.substring(0, ifIndex).trim();
-                    condition = defaultLine.substring(ifIndex + 4).trim();
+                if (condition) {
                     Logger.debugParser(`[DEFAULT_PARSER] ${_configName} -> default "${defaultValue}" if ${condition}`);
                 } else {
-                    defaultValue = defaultLine.trim();
                     Logger.debugParser(`[DEFAULT_PARSER] ${_configName} -> default "${defaultValue}"`);
                 }
 
@@ -688,9 +650,13 @@ export class KconfigParser {
 
             // Parse range
             if (line.startsWith('range ')) {
-                const rangeMatch = line.match(/range\s+(\d+)\s+(\d+)/);
-                if (rangeMatch) {
-                    menu.range = [parseInt(rangeMatch[1]), parseInt(rangeMatch[2])];
+                const rangeParts = line.substring(6).trim().split(/\s+/);
+                if (rangeParts.length >= 2) {
+                    const min = parseKconfigNumber(rangeParts[0]);
+                    const max = parseKconfigNumber(rangeParts[1]);
+                    if (min !== null && max !== null) {
+                        menu.range = [min, max];
+                    }
                 }
             }
             
@@ -788,11 +754,10 @@ export class KconfigParser {
         });
         node.item = menu;
 
-        const firstQuote = firstLine.indexOf('"');
-        const secondQuote = firstLine.indexOf('"', firstQuote + 1);
         let promptCond = "y";
-        if (secondQuote !== -1) {
-            const after = firstLine.substring(secondQuote + 1).trim();
+        const promptToken = this.extractQuotedToken(firstLine.substring("comment ".length));
+        if (promptToken) {
+            const after = firstLine.substring("comment ".length + promptToken.end).trim();
             if (after.startsWith("if ")) {
                 promptCond = after.substring(3).trim();
             }
@@ -839,6 +804,7 @@ export class KconfigParser {
                 const dep = line.substring("depends on ".length).trim();
                 node.dep = this.andExpr(node.dep, dep) ?? dep;
                 menu.dependsOn = node.dep || "";
+                menu.directDepExpr = dep;
                 i++;
                 continue;
             }
@@ -892,20 +858,15 @@ export class KconfigParser {
             
             // Parse prompt
             if (line.startsWith('prompt ')) {
-                const promptMatch = line.match(/prompt\s+"([^"]+)"/);
-                if (promptMatch) {
-                    menu.title = promptMatch[1];
-                    // 解析 prompt 行上的 if 条件
-                    const firstQuote = line.indexOf('"');
-                    const secondQuote = line.indexOf('"', firstQuote + 1);
+                const promptToken = this.extractQuotedToken(line.substring('prompt '.length));
+                if (promptToken) {
+                    menu.title = promptToken.value;
                     let cond = 'y';
-                    if (secondQuote !== -1) {
-                        const after = line.substring(secondQuote + 1).trim();
-                        if (after.startsWith('if ')) {
-                            cond = after.substring(3).trim();
-                        }
+                    const after = line.substring('prompt '.length + promptToken.end).trim();
+                    if (after.startsWith('if ')) {
+                        cond = after.substring(3).trim();
                     }
-                    node.prompt = [promptMatch[1], cond];
+                    node.prompt = [promptToken.value, cond];
                     hasPrompt = true;
                 }
                 i++;
@@ -916,6 +877,7 @@ export class KconfigParser {
                 const dep = line.substring('depends on '.length).trim();
                 node.dep = this.andExpr(node.dep, dep) ?? dep;
                 menu.dependsOn = node.dep || '';
+                menu.directDepExpr = dep;
                 i++;
                 continue;
             }
@@ -923,16 +885,9 @@ export class KconfigParser {
             // Parse default (support "default VALUE [if CONDITION]")
             if (line.startsWith('default ')) {
                 const defaultLine = line.substring(8).trim();
-                const ifIndex = defaultLine.indexOf(' if ');
-                let defaultValue: string;
-                let condition: string | undefined;
-
-                if (ifIndex > -1) {
-                    defaultValue = defaultLine.substring(0, ifIndex).trim();
-                    condition = defaultLine.substring(ifIndex + 4).trim();
-                } else {
-                    defaultValue = defaultLine.trim();
-                }
+                const split = this.splitValueAndCondition(defaultLine);
+                const defaultValue = split.value;
+                const condition = split.condition;
 
                 // 收集 choice 的默认值列表，保留顺序（与 Kconfig 语义一致，后匹配覆盖先匹配）
                 if (!menu.defaults) {
@@ -966,6 +921,13 @@ export class KconfigParser {
                 } else {
                     i++;
                 }
+                continue;
+            }
+
+            if (line.startsWith('source ') || line.startsWith('rsource ') ||
+                line.startsWith('osource ') || line.startsWith('orsource ')) {
+                await this.parseSourceIntoParent(line, currentFile, node);
+                i++;
                 continue;
             }
             
@@ -1185,8 +1147,10 @@ export class KconfigParser {
                 if (child.item) {
                     if (combinedCondition) {
                         child.item.dependsOn = combinedCondition;
+                        child.item.effectiveDepExpr = combinedCondition;
                     } else if (!child.item.dependsOn) {
                         child.item.dependsOn = '';
+                        child.item.effectiveDepExpr = '';
                     }
                 }
 
@@ -1465,6 +1429,8 @@ export class KconfigParser {
             menuPath: options.menuPath,
             directDepValue: options.directDepValue,
             directDepExpr: options.directDepExpr,
+            effectiveDepValue: options.effectiveDepValue,
+            effectiveDepExpr: options.effectiveDepExpr,
             prompt: options.prompt || options.title || '',
             selectInfo: options.selectInfo,
             selectedByInfo: options.selectedByInfo,
@@ -1508,13 +1474,14 @@ export class KconfigParser {
         currentFile: string,
         options?: { suppressWarnings?: boolean }
     ): Promise<{ files: string[]; optional: boolean } | null> {
-        const match = line.match(/^(source|rsource|osource|orsource)\s+"?([^"]+)"?/);
+        const match = line.match(/^(source|rsource|osource|orsource)\s+(.+)$/);
         if (!match) {
             return null;
         }
         
         const directive = match[1];
-        let sourcePath = match[2];
+        const sourceToken = this.extractQuotedToken(match[2]);
+        let sourcePath = sourceToken ? sourceToken.value : match[2].trim();
         const optional = directive.startsWith('o');
         const isRelativeDirective = directive === 'rsource' || directive === 'orsource';
         const srctreeRoot = this.srctreeRoot;
@@ -1550,6 +1517,45 @@ export class KconfigParser {
             // Single file
             const normalizedPath = path.normalize(resolvedPattern);
             return { files: this.deduplicateSourceFiles([normalizedPath]), optional };
+        }
+    }
+
+    private async parseSourceIntoParent(line: string, currentFile: string, parent: MenuNode): Promise<void> {
+        const sourceResult = await this.parseSource(line, currentFile);
+        if (!sourceResult) {
+            Logger.warn(`Source directive failed: ${line}`);
+            return;
+        }
+
+        const sourceFiles = this.deduplicateSourceFiles(sourceResult.files);
+        await this.preloadSourceFiles(sourceFiles, line);
+        for (const sourceFile of sourceFiles) {
+            const normalizedSource = path.normalize(sourceFile);
+            if (this.activeParsingFiles.has(normalizedSource)) {
+                Logger.warn(`Detected recursive source include, skipping: ${normalizedSource}`);
+                continue;
+            }
+            this.fileOpenCounter++;
+            this.openedFilesList.push({
+                index: this.fileOpenCounter,
+                file: normalizedSource,
+                directive: line,
+                time: new Date(),
+            });
+            this.allParsedFiles.add(normalizedSource);
+            const sourceLines = await this.readFile(normalizedSource);
+            if (sourceLines.length === 0) {
+                if (!sourceResult.optional) {
+                    Logger.warn(`Source file not found or empty: ${normalizedSource}`);
+                }
+                continue;
+            }
+            this.activeParsingFiles.add(normalizedSource);
+            try {
+                await this.parseLines(sourceLines, parent, normalizedSource);
+            } finally {
+                this.activeParsingFiles.delete(normalizedSource);
+            }
         }
     }
 
@@ -1709,51 +1715,100 @@ export class KconfigParser {
      * Extract quoted string from a line
      */
     private extractQuotedString(line: string): string {
-        const match = line.match(/"([^"]+)"/);
-        return match ? match[1] : line.trim();
+        const token = this.extractQuotedToken(line);
+        return token ? token.value : line.trim();
     }
 
-    /**
-     * Parse default value based on type
-     */
-    private parseDefaultValue(value: string, type: menuType): any {
-        value = value.replace(/"/g, '').trim();
-        
-        switch (type) {
-            case menuType.bool: {
-                const lower = value.toLowerCase();
-                return lower === 'y' || lower === 'true' || lower === '1';
-            }
-            case menuType.tristate: {
-                const lower = value.toLowerCase();
-                if (lower === 'y' || lower === 'm' || lower === 'n') {
-                    return lower;
-                }
-                if (lower === 'true') {
-                    return 'y';
-                }
-                if (lower === 'false') {
-                    return 'n';
-                }
-                if (lower === '2') {
-                    return 'y';
-                }
-                if (lower === '1') {
-                    return 'm';
-                }
-                if (lower === '0') {
-                    return 'n';
-                }
-                return lower || 'n';
-            }
-            case menuType.int:
-                return parseInt(value) || 0;
-            case menuType.hex:
-                return value;
-            case menuType.string:
-            default:
-                return value;
+    private extractQuotedToken(line: string): { value: string; start: number; end: number } | null {
+        const start = line.indexOf('"');
+        if (start === -1) {
+            return null;
         }
+
+        let value = '';
+        let escaped = false;
+        for (let i = start + 1; i < line.length; i++) {
+            const ch = line[i];
+            if (escaped) {
+                value += this.decodeKconfigEscape(ch);
+                escaped = false;
+                continue;
+            }
+            if (ch === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (ch === '"') {
+                return { value, start, end: i + 1 };
+            }
+            value += ch;
+        }
+
+        return null;
+    }
+
+    private decodeKconfigEscape(ch: string): string {
+        switch (ch) {
+            case '"':
+            case '\\':
+                return ch;
+            case 'n':
+                return '\n';
+            case 't':
+                return '\t';
+            default:
+                return `\\${ch}`;
+        }
+    }
+
+    private splitValueAndCondition(text: string): { value: string; condition?: string } {
+        const ifIndex = this.findTopLevelIfSeparator(text);
+        if (ifIndex === -1) {
+            return { value: text.trim() };
+        }
+        return {
+            value: text.substring(0, ifIndex).trim(),
+            condition: text.substring(ifIndex + 4).trim(),
+        };
+    }
+
+    private findTopLevelIfSeparator(text: string): number {
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (inString) {
+                if (ch === '\\') {
+                    escaped = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+            if (ch === '(') {
+                depth++;
+                continue;
+            }
+            if (ch === ')') {
+                depth = Math.max(0, depth - 1);
+                continue;
+            }
+            if (depth === 0 && text.substring(i, i + 4) === ' if ') {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     /**

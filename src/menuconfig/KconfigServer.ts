@@ -18,6 +18,13 @@ import * as path from "path";
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { Menu, menuType } from "./Menu";
+import {
+    areMenuValuesEqual,
+    normalizeConfigStringValue,
+    normalizeHexValue,
+    normalizeIntValue,
+    normalizeTristateValue
+} from "./MenuValueUtils";
 import { KconfigMenuLoader } from "./KconfigMenuLoader";
 import { createMenuDetailPayload, MenuDetailPayload } from "./MenuTransferSerializer";
 import { Logger } from "../logger/logger";
@@ -80,6 +87,7 @@ export class KconfigServer extends EventEmitter {
     private choiceParentByChildId: Map<string, Menu> = new Map();
     private menuParentByChildId: Map<string, string | null> = new Map();
     private menuStateCache: Map<string, MenuStateSnapshot> = new Map();
+    private defaultSnapshot: Menu[] = [];
     
     constructor(options: KconfigServerOptions) {
         super();
@@ -124,21 +132,22 @@ export class KconfigServer extends EventEmitter {
         const targetFile = vscode.Uri.file(this.kconfigFile);
         const loader = new KconfigMenuLoader(this.workspaceFolder, targetFile);
         this.kconfigMenus = await loader.loadKconfigMenus();
-        
-        // Save default values from Kconfig
-        this.saveDefaultValues(this.kconfigMenus);
-        this.rebuildMenuCaches();
-        
-        // Load existing config values if available
-        if (fs.existsSync(this.configFile)) {
-            await this.loadConfigValues();
-        }
-        this.reconcileChoicesFromChildren();
-        
-        // Initialize visibility manager with loaded menus
+
+        // Initialize once without user values so conditional defaults and choice defaults
+        // are captured before .config is applied.
         Logger.info(() => `[KCONFIG_SERVER] Initializing visibility manager with ${this.kconfigMenus.length} menus`);
         this.visibilityManager.initialize(this.kconfigMenus);
         this.forceTopLevelMenusVisible(this.kconfigMenus);
+        this.captureDefaultSnapshot(this.kconfigMenus);
+        this.saveDefaultValues(this.kconfigMenus);
+        this.rebuildMenuCaches();
+
+        // Load existing config values if available
+        if (fs.existsSync(this.configFile)) {
+            await this.loadConfigValues();
+            this.visibilityManager.initialize(this.kconfigMenus);
+            this.forceTopLevelMenusVisible(this.kconfigMenus);
+        }
 
         this.rebuildMenuCaches();
         Logger.info(() => `[KCONFIG_SERVER] Initialized with ${this.kconfigMenus.length} menus and visibility manager`);
@@ -152,13 +161,16 @@ export class KconfigServer extends EventEmitter {
     public async reloadFromDisk(): Promise<Menu[]> {
         const loader = new KconfigMenuLoader(this.workspaceFolder, vscode.Uri.file(this.kconfigFile));
         this.kconfigMenus = await loader.loadKconfigMenus();
+        this.visibilityManager.initialize(this.kconfigMenus);
+        this.forceTopLevelMenusVisible(this.kconfigMenus);
+        this.captureDefaultSnapshot(this.kconfigMenus);
         this.saveDefaultValues(this.kconfigMenus);
         this.rebuildMenuCaches();
         if (fs.existsSync(this.configFile)) {
             await this.loadConfigValues();
+            this.visibilityManager.initialize(this.kconfigMenus);
+            this.forceTopLevelMenusVisible(this.kconfigMenus);
         }
-        this.visibilityManager.initialize(this.kconfigMenus);
-        this.forceTopLevelMenusVisible(this.kconfigMenus);
         this.rebuildMenuCaches();
         Logger.info(() => "[KCONFIG_SERVER] Reloaded from disk: " + this.kconfigMenus.length + " menus");
         return this.kconfigMenus;
@@ -181,12 +193,21 @@ export class KconfigServer extends EventEmitter {
         if (!detail.prompt) {
             detail.prompt = menu.title || menu.name || "";
         }
-        if (!detail.directDepExpr && menu.dependsOn && menu.dependsOn.trim() !== "" && menu.dependsOn.trim() !== "y") {
-            detail.directDepExpr = menu.dependsOn;
+        if (!detail.effectiveDepExpr && menu.dependsOn && menu.dependsOn.trim() !== "" && menu.dependsOn.trim() !== "y") {
+            detail.effectiveDepExpr = menu.dependsOn;
+        }
+        if (detail.directDepExpr) {
+            detail.directDepValue = this.visibilityManager.getEvaluator().evaluate(detail.directDepExpr) ? "met" : "not met";
+        }
+        if (detail.effectiveDepExpr) {
+            detail.effectiveDepValue = this.visibilityManager.getEvaluator().evaluate(detail.effectiveDepExpr) ? "visible" : "hidden";
         }
         if (!detail.menuPath) {
             detail.menuPath = this.buildMenuPath(id);
         }
+        detail.selectInfo = detail.selectInfo || this.describeTargets(menu.select, menu.selectConditions);
+        detail.selectedByInfo = detail.selectedByInfo || this.describeList(menu.selectedBy);
+        detail.implyInfo = detail.implyInfo || this.describeTargets(menu.implies, menu.implyConditions);
         return detail;
     }
     
@@ -200,18 +221,10 @@ export class KconfigServer extends EventEmitter {
 
         // Validate and clamp numeric-like values against range constraints.
         let newValue = updatedMenu.value;
-        if ((targetMenu.type === menuType.int || targetMenu.type === menuType.hex) && targetMenu.range && targetMenu.range.length >= 2) {
-            const min = targetMenu.range[0];
-            const max = targetMenu.range[1];
-            const numValue = typeof newValue === 'number' ? newValue : parseInt(newValue.toString(), 10);
-
-            if (!isNaN(numValue)) {
-                if (numValue < min) {
-                    newValue = min;
-                } else if (numValue > max) {
-                    newValue = max;
-                }
-            }
+        if (targetMenu.type === menuType.int) {
+            newValue = normalizeIntValue(newValue, targetMenu.range);
+        } else if (targetMenu.type === menuType.hex) {
+            newValue = normalizeHexValue(newValue, targetMenu.range);
         }
 
         targetMenu.value = newValue;
@@ -225,7 +238,6 @@ export class KconfigServer extends EventEmitter {
     }
     
     public async saveConfig(): Promise<void> {
-        this.logCurrentValues("[SAVE] Values before save");
 
         try {
             const assignments: SymbolAssignment[] = this.kconfigWriter.collectAssignments(this.kconfigMenus);
@@ -281,48 +293,15 @@ export class KconfigServer extends EventEmitter {
     }
     
     public async resetToDefaults(): Promise<void> {
-        // Logger.info("[RESET] Starting reset to defaults operation");
-        // Logger.info(`[RESET] Default values stored: ${this.defaultValues.size}`);
-        // Logger.info(`[RESET] Config file path: ${this.configFile}`);
-
-        // 通知 FileWatcher 忽略接下来的文件变化（删除操作触发的）
         FileWatcher.getInstance()?.ignoreNextChange();
 
-        // Delete .config file if it exists
         if (fs.existsSync(this.configFile)) {
             try {
                 await fs.promises.unlink(this.configFile);
-                // Logger.info("[RESET] Successfully deleted .config file");
             } catch (error) {
-                // Logger.warn(`[RESET] Failed to delete .config file: ${error}`);
+                // deletion is best-effort
             }
-        } else {
-            // Logger.info("[RESET] .config file does not exist, nothing to delete");
         }
-        
-        // Log all stored default values
-        // for (const [name, value] of this.defaultValues.entries()) {
-        //     Logger.info(`[RESET] Default value: ${name} = ${value}`);
-        // }
-        
-        // Reset all values to their default values from Kconfig
-        const resetMenuValues = (menus: Menu[], depth = 0) => {
-            const _indent = "  ".repeat(depth);
-            
-            for (const menu of menus) {
-                if (menu.type !== menuType.menu && menu.name) {
-                    const _oldValue = menu.value;
-                    // Restore the default value from saved defaults
-                    const defaultValue = this.defaultValues.get(menu.name);
-                    menu.value = defaultValue !== undefined ? defaultValue : null;
-                    
-                    // Logger.info(`[RESET] ${indent}${menu.name} (${menu.type}): ${oldValue} -> ${menu.value} (default: ${defaultValue})`);
-                }
-                if (menu.children) {
-                    resetMenuValues(menu.children, depth + 1);
-                }
-            }
-        };
         
         this.resetMenuValuesToDefaults();
 
@@ -357,20 +336,8 @@ export class KconfigServer extends EventEmitter {
     }
 
     private resetMenuValuesToDefaults(): void {
-        const resetMenuValues = (menus: Menu[]) => {
-            for (const menu of menus) {
-                if (menu.type !== menuType.menu && menu.name && menu.type !== menuType.choice) {
-                    const defaultValue = this.defaultValues.get(menu.name);
-                    menu.value = defaultValue !== undefined ? defaultValue : null;
-                }
-                if (menu.children) {
-                    resetMenuValues(menu.children);
-                }
-            }
-        };
-        resetMenuValues(this.kconfigMenus);
-        // Restore choice selections from child defaults
-        this.reconcileChoicesFromChildren();
+        this.kconfigMenus = this.cloneMenus(this.defaultSnapshot);
+        this.rebuildMenuCaches();
     }
     
     private async loadConfigValues(): Promise<void> {
@@ -425,65 +392,9 @@ export class KconfigServer extends EventEmitter {
 
             Logger.info(() => `[LOAD_CONFIG] Processed ${_processedLines} config lines, skipped ${_skippedLines} lines`);
 
-            // After loading raw values, reconcile choice containers from children values
-            this.reconcileChoicesFromChildren();
-
-            // Extra debug for memory allocator related symbols
-            const logVal = (name: string) => {
-                const menu = this.findMenuByName(name);
-                return menu ? `name=${name}, value=${menu.value}` : `name=${name} not found`;
-            };
-            Logger.info("[LOAD_CONFIG] Memory allocator status after load:");
-            Logger.info("[LOAD_CONFIG]   " + logVal("RT_USING_SMALL_MEM"));
-            Logger.info("[LOAD_CONFIG]   " + logVal("RT_USING_SLAB"));
-            Logger.info("[LOAD_CONFIG]   " + logVal("RT_USING_SMALL_MEM_AS_HEAP"));
-            Logger.info("[LOAD_CONFIG]   " + logVal("RT_USING_SLAB_AS_HEAP"));
-            const heapChoice = this.findParentChoice("RT_USING_SMALL_MEM_AS_HEAP") || this.findParentChoice("RT_USING_SLAB_AS_HEAP");
-            if (heapChoice) {
-                Logger.info(() => `[LOAD_CONFIG]   choice(System Heap) selected: ${heapChoice.value}`);
-            }
         } catch (error) {
             Logger.error("Failed to load config values", error as Error);
         }
-    }
-
-    /**
-     * Reconcile choice container values based on their children's boolean values.
-     * Kconfiglib semantics: if a child bool within a choice is 'y', that child is the selection.
-     * When multiple children are 'y' (shouldn't happen), prefer the last 'y' encountered.
-     */
-    private reconcileChoicesFromChildren(): void {
-        const process = (menus: Menu[]) => {
-            for (const menu of menus) {
-                if (menu.type === menuType.choice && menu.children && menu.children.length > 0) {
-                    let selected: string | null = null;
-                    for (const child of menu.children) {
-                        if (child.type === menuType.bool && child.value === true) {
-                            selected = child.name;
-                        }
-                    }
-                    // Fallback: use the first unconditional default from the choice definition
-                    if (!selected && menu.defaults && menu.defaults.length > 0) {
-                        for (const def of menu.defaults) {
-                            if (!def.condition || def.condition.trim() === "y") {
-                                selected = def.value;
-                                break;
-                            }
-                        }
-                    }
-                    if (selected) {
-                        menu.value = selected;
-                        for (const child of menu.children) {
-                            child.value = child.name === selected;
-                        }
-                    }
-                }
-                if (menu.children && menu.children.length > 0) {
-                    process(menu.children);
-                }
-            }
-        };
-        process(this.kconfigMenus);
     }
     
     private updateMenuValueByName(name: string, value: string): boolean {
@@ -516,25 +427,27 @@ export class KconfigServer extends EventEmitter {
     }
     
     private saveDefaultValues(menus: Menu[]): void {
-        // Logger.info("[SAVE_DEFAULTS] Starting to save default values");
-        
+        this.defaultValues.clear();
         const saveValues = (menus: Menu[], depth = 0) => {
-            const _indent = "  ".repeat(depth);
-            
             for (const menu of menus) {
                 if (menu.type !== menuType.menu && menu.name) {
-                    // 保存所有有name的菜单项的默认值，包括值为null或undefined的
                     this.defaultValues.set(menu.name, menu.value);
-                    // Logger.info(`[SAVE_DEFAULTS] ${indent}Saved default: ${menu.name} (${menu.type}) = ${menu.value}`);
                 }
                 if (menu.children) {
                     saveValues(menu.children, depth + 1);
                 }
             }
         };
-        
+
         saveValues(menus);
-        // Logger.info(`[SAVE_DEFAULTS] Saved ${this.defaultValues.size} default values`);
+    }
+
+    private captureDefaultSnapshot(menus: Menu[]): void {
+        this.defaultSnapshot = this.cloneMenus(menus);
+    }
+
+    private cloneMenus(menus: Menu[]): Menu[] {
+        return JSON.parse(JSON.stringify(menus)) as Menu[];
     }
 
     /**
@@ -558,9 +471,6 @@ export class KconfigServer extends EventEmitter {
      * Format a single config as a C #define statement
      * (deprecated: retained for backward compatibility)
      */
-    private formatHeaderLine(_: Menu, __: unknown): string {
-        return "";
-    }
 
     /**
      * Escapes string for .config file output, matching Kconfiglib behavior
@@ -646,6 +556,28 @@ export class KconfigServer extends EventEmitter {
         return `(Top) -> ${segments.join(" -> ")}`;
     }
 
+    private describeList(values: string[] | undefined): string | undefined {
+        if (!values || values.length === 0) {
+            return undefined;
+        }
+        return values.join(", ");
+    }
+
+    private describeTargets(
+        values: string[] | undefined,
+        conditions?: { [target: string]: string }
+    ): string | undefined {
+        if (!values || values.length === 0) {
+            return undefined;
+        }
+        return values
+            .map((target) => {
+                const condition = conditions?.[target];
+                return condition ? `${target} if ${condition}` : target;
+            })
+            .join(", ");
+    }
+
     private updateIndexedMenuValues(name: string, rawValue: string): boolean {
         const targets = this.menuNameIndex.get(name);
         if (!targets || targets.length === 0) {
@@ -662,47 +594,50 @@ export class KconfigServer extends EventEmitter {
         switch (menu.type) {
             case menuType.bool: {
                 menu.value = rawValue === "y";
+                menu.isDefaultValue = false;
                 const parentChoice = this.choiceParentByChildId.get(menu.id);
                 if (parentChoice) {
                     if (menu.value === true) {
                         parentChoice.value = menu.name;
+                        parentChoice.isDefaultValue = false;
                         for (const sibling of parentChoice.children || []) {
                             if (sibling.name !== menu.name && sibling.type === menuType.bool) {
                                 sibling.value = false;
+                                sibling.isDefaultValue = false;
                             }
                         }
                         Logger.info(() => `[LOAD_CONFIG] Set parent choice "${parentChoice.title || parentChoice.name}" <- ${menu.name}`);
                     } else if (parentChoice.value === menu.name) {
                         parentChoice.value = null as any;
+                        parentChoice.isDefaultValue = false;
                     }
                 }
                 return;
             }
             case menuType.tristate: {
-                let normalized: "y" | "m" | "n" = "n";
-                const lower = rawValue.toLowerCase();
-                if (lower === "y" || lower === "2") {
-                    normalized = "y";
-                } else if (lower === "m" || lower === "1") {
-                    normalized = "m";
-                }
-                menu.value = normalized;
+                menu.value = normalizeTristateValue(rawValue);
+                menu.isDefaultValue = false;
                 return;
             }
             case menuType.int:
-                menu.value = parseInt(rawValue, 10);
+                menu.value = normalizeIntValue(rawValue, menu.range);
+                menu.isDefaultValue = false;
                 return;
             case menuType.hex:
-                menu.value = rawValue;
+                menu.value = normalizeHexValue(rawValue, menu.range);
+                menu.isDefaultValue = false;
                 return;
             case menuType.string:
-                menu.value = rawValue.replace(/^"(.*)"$/, "$1");
+                menu.value = normalizeConfigStringValue(rawValue);
+                menu.isDefaultValue = false;
                 return;
             case menuType.choice:
                 menu.value = rawValue === "y" ? menu.name : null;
+                menu.isDefaultValue = false;
                 return;
             default:
                 menu.value = rawValue;
+                menu.isDefaultValue = false;
                 return;
         }
     }
@@ -777,15 +712,7 @@ export class KconfigServer extends EventEmitter {
     }
 
     private areMenuValuesEqual(previous: any, current: any, type: menuType): boolean {
-        switch (type) {
-            case menuType.int:
-                return Number(previous) === Number(current);
-            case menuType.hex:
-                if (previous === undefined && current === undefined) return true;
-                return String(previous || '').toLowerCase() === String(current || '').toLowerCase();
-            default:
-                return previous === current;
-        }
+        return areMenuValuesEqual(previous, current, type);
     }
 
     private arrayChanged(a?: string[], b?: string[]): boolean {
@@ -806,25 +733,6 @@ export class KconfigServer extends EventEmitter {
         return false;
     }
 
-    private logCurrentValues(_prefix: string): void {
-        const logMenuValues = (menus: Menu[], depth = 0) => {
-            const _indent = "  ".repeat(depth);
-
-            for (const menu of menus) {
-                if (menu.name && menu.value !== null && menu.value !== undefined) {
-                    // Logger.info(`${prefix} ${indent}${menu.name} (${menu.type}): ${menu.value}`);
-                }
-                
-                if (menu.children && menu.children.length > 0) {
-                    logMenuValues(menu.children, depth + 1);
-                }
-            }
-        };
-        
-        // Logger.info(`${prefix} - Current configuration values:`);
-        logMenuValues(this.kconfigMenus);
-    }
-    
     public dispose(): void {
         if (this.serverProcess) {
             this.serverProcess.kill();
