@@ -1,59 +1,61 @@
 # IMDE
 
+简体中文 | [English](README.en.md)
+
 [![CI](https://github.com/trevisy/IMDE/actions/workflows/ci.yml/badge.svg)](https://github.com/trevisy/IMDE/actions/workflows/ci.yml)
 
-IMDE is a VS Code extension for Ingenic MCU SDK projects. It integrates the
-SDK's local `tools/imde/imde.py` command-line interface into VS Code so that
-common development tasks are available in one workspace.
+IMDE 是一个面向 Ingenic MCU SDK 工程的 VS Code 扩展。它将 SDK 中的
+`tools/imde/imde.py` 命令行工具集成到 VS Code，让常用开发流程可以在同一
+个工作区内完成。
 
-## Features
+## 功能
 
-- Environment diagnostics and SDK toolchain checks.
-- Configure, build, clean, full-clean, and defconfig workflows.
-- GUI configuration for Kconfig-based projects.
-- Pinmux and BSP configuration tools.
-- Build artifact browsing and interactive memory-map viewing.
-- IntelliSense setup from generated compilation data.
+- 环境诊断与 SDK 工具链检查。
+- Configure、Build、Clean、Full Clean 和 defconfig 工作流。
+- Kconfig 图形化配置工具。
+- Pinmux 与 BSP 配置工具。
+- 构建产物浏览和交互式 Memory Map 查看。
+- 根据编译数据库自动配置 IntelliSense。
 
-## Requirements
+## 使用要求
 
-- VS Code 1.85 or later.
-- An Ingenic MCU SDK workspace containing `imde.json`.
-- The SDK dependencies reported by `IMDE: Run Doctor`, including Python,
-  CMake, Ninja, and the configured toolchain.
+- VS Code 1.85 或更高版本。
+- 包含 `imde.json` 的 Ingenic MCU SDK 工程。
+- `IMDE: Run Doctor` 检查通过的 SDK 依赖，包括 Python、CMake、Ninja 和
+  已配置的工具链。
 
-## Install
+## 安装
 
-1. Open the [latest release](https://github.com/trevisy/IMDE/releases/latest).
-2. Download the `imde-<version>.vsix` asset.
-3. In VS Code, run `Extensions: Install from VSIX...` and select the file.
-4. Open an SDK project and run `IMDE: Run Doctor` from the Command Palette.
+1. 打开 [最新 Release](https://github.com/trevisy/IMDE/releases/latest)。
+2. 下载其中的 `imde-<version>.vsix` 文件。
+3. 在 VS Code 中执行 `Extensions: Install from VSIX...`，选择下载的文件。
+4. 打开 SDK 工程，在命令面板运行 `IMDE: Run Doctor`。
 
-## Everyday Workflow
+## 日常流程
 
-1. Open an SDK project folder in VS Code.
-2. Use `IMDE: Run Doctor` to verify the environment.
-3. Select a defconfig, then run `IMDE: Configure`.
-4. Run `IMDE: Build` and inspect the generated artifacts in the IMDE sidebar.
+1. 在 VS Code 中打开 SDK 工程目录。
+2. 使用 `IMDE: Run Doctor` 检查开发环境。
+3. 选择 defconfig，然后运行 `IMDE: Configure`。
+4. 运行 `IMDE: Build`，在 IMDE 侧边栏查看构建产物。
 
-The extension activates only for workspaces that contain `imde.json`. Use the
-`imde.projectDir` setting when the SDK project is not the workspace root.
+扩展只会在工作区包含 `imde.json` 时激活。如果 SDK 工程不是工作区根目录，
+可以使用 `imde.projectDir` 设置指定工程路径。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 .
-|- src/                 Extension TypeScript and webview source
-|- test/                Automated tests and reusable fixtures
-|- media/               Extension icons and branding assets
-|- docs/                Development, architecture, and release documentation
-|- .github/             CI and contributor-facing GitHub configuration
-|- CHANGELOG.md         Version history
-|- package.json         Extension manifest and npm scripts
-`- webpack.config.js    Extension and webview bundling configuration
+|- src/                 扩展 TypeScript 与 Webview 源码
+|- test/                自动化测试与可复用 fixture
+|- media/               扩展图标与品牌资源
+|- docs/                开发、架构和发布文档
+|- .github/             CI 与 GitHub 协作配置
+|- CHANGELOG.md         版本历史
+|- package.json         扩展清单与 npm 脚本
+`- webpack.config.js    扩展与 Webview 打包配置
 ```
 
-## Development
+## 开发
 
 ```powershell
 npm ci
@@ -61,16 +63,14 @@ npm run compile
 npm test
 ```
 
-See [development documentation](docs/development.md) for debugging, packaging,
-and the complete validation workflow. The design overview is in
-[architecture documentation](docs/architecture.md).
+请参阅[开发文档](docs/development.md)了解调试、打包和完整验证流程，架构
+说明见[架构文档](docs/architecture.md)。
 
-## Contributing
+## 参与贡献
 
-Bug reports and feature requests are welcome through GitHub Issues. Please
-read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Security
-issues should follow [SECURITY.md](SECURITY.md).
+欢迎通过 GitHub Issues 报告问题或提出功能建议。提交 Pull Request 前请阅读
+[CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请遵循 [SECURITY.md](SECURITY.md)。
 
-## License
+## 许可证
 
-This project is distributed under the [ISC License](LICENSE).
+本项目使用 [ISC License](LICENSE) 发布。
