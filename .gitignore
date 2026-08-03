@@ -4,6 +4,7 @@ out/
 *.tgz
 *.tsbuildinfo
 npm-debug.log*
+dist/**/*.map
 
 # Local screenshots and manual references
 现状.png

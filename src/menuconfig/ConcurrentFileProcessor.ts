@@ -140,15 +140,6 @@ export class ConcurrentFileProcessor {
     }
     
     /**
-     * 估算性能提升倍数
-     */
-    private estimateSpeedImprovement(fileCount: number, actualTime: number): number {
-        // 假设串行读取每个文件需要 50ms (保守估计)
-        const estimatedSerialTime = fileCount * 50;
-        return Math.round((estimatedSerialTime / actualTime) * 10) / 10;
-    }
-    
-    /**
      * 延迟工具函数
      */
     private sleep(ms: number): Promise<void> {

@@ -16,7 +16,7 @@ import { createPinia } from "pinia";
 import { useMenuconfigStore } from "./store";
 import { t } from "./i18n";
 import type { Menu } from "../../menuconfig/Menu";
-import resolveTheme from "./themes";
+import Menuconfig from "./themes";
 
 interface BackendStartupBeginMetrics {
   sessionId?: number;
@@ -34,11 +34,6 @@ interface BackendStartupEndMetrics {
   panelToEndMs?: number;
 }
 
-const requestedTheme =
-  typeof window !== "undefined"
-    ? (window as typeof window & { __KCONFIG_THEME__?: string }).__KCONFIG_THEME__
-    : undefined;
-const Menuconfig = resolveTheme(requestedTheme);
 const app = createApp(Menuconfig);
 const pinia = createPinia();
 

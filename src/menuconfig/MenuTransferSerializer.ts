@@ -32,15 +32,21 @@ export interface MenuDetailPayload {
   prompt?: string;
   directDepExpr?: string;
   directDepValue?: string;
+  effectiveDepExpr?: string;
+  effectiveDepValue?: string;
   sourceFile?: string;
   sourceFiles?: string[];
   linenr?: number;
   menuPath?: string;
   dependsOn?: string;
+  range?: number[];
   defaults?: Array<{ value: any; condition?: string }>;
   selectInfo?: string;
   selectedByInfo?: string;
   implyInfo?: string;
+  select?: string[];
+  selectedBy?: string[];
+  implies?: string[];
 }
 
 export interface MenuChunkTask {
@@ -107,15 +113,21 @@ export function createMenuDetailPayload(menu: Menu): MenuDetailPayload {
     prompt: menu.prompt,
     directDepExpr: menu.directDepExpr,
     directDepValue: menu.directDepValue,
+    effectiveDepExpr: menu.effectiveDepExpr,
+    effectiveDepValue: menu.effectiveDepValue,
     sourceFile: menu.sourceFile,
     sourceFiles: menu.sourceFiles ? [...menu.sourceFiles] : undefined,
     linenr: menu.linenr,
     menuPath: menu.menuPath,
     dependsOn: menu.dependsOn,
+    range: menu.range ? [...menu.range] : undefined,
     defaults: menu.defaults ? menu.defaults.map((entry) => ({ ...entry })) : undefined,
     selectInfo: menu.selectInfo,
     selectedByInfo: menu.selectedByInfo,
     implyInfo: menu.implyInfo,
+    select: menu.select ? [...menu.select] : undefined,
+    selectedBy: menu.selectedBy ? [...menu.selectedBy] : undefined,
+    implies: menu.implies ? [...menu.implies] : undefined,
   };
 }
 

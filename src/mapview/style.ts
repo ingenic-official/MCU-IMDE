@@ -42,9 +42,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .tooltip .tt-val{font-weight:600}
 .tooltip .tt-src{font-size:10px;margin:2px 0}
 .tooltip .tt-src a{text-decoration:none}
-.legend{display:flex;gap:14px;margin-top:10px;font-size:11px;flex-shrink:0;flex-wrap:wrap}
+.legend{display:flex;gap:14px;margin-top:12px;font-size:11px;flex-shrink:0;flex-wrap:wrap}
 .legend-item{display:flex;align-items:center;gap:5px}
 .legend-color{width:10px;height:10px;border-radius:3px}
+.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px;flex-shrink:0;overflow:auto;padding-bottom:2px}
+.insight-card{background:${c.cardBg};border:1px solid ${c.border};border-radius:10px;padding:16px 18px;min-width:0;min-height:150px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.insight-title{font-size:11px;color:${c.muted};text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:12px}
+.insight-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(52px,auto);gap:14px;align-items:center;font-size:13px;padding:6px 0}
+.insight-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.insight-size{font-weight:700}
+.insight-pct{color:${c.muted};font-family:monospace;font-size:12px;text-align:right}
+.mini-bar{height:8px;background:${isDark?"#3c3c3c":"#e0e0e0"};border-radius:999px;overflow:hidden;margin:5px 0 8px}
+.mini-fill{height:100%;border-radius:999px;background:${c.accent}}
 .section-list{display:none;flex:1;overflow:auto;padding:8px}
 .section-list.active{display:block}
 .section-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:6px;font-size:14px;transition:background .1s}

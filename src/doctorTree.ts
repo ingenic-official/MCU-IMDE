@@ -8,10 +8,9 @@ export class DoctorTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
   private lastRefresh = 0;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private loading = false;
+  private loaded = false;
 
-  constructor(private runner: ImdeRunner) {
-    this.refresh();
-  }
+  constructor(private runner: ImdeRunner) {}
 
   refresh(force = false): void {
     const now = Date.now();
@@ -35,11 +34,16 @@ export class DoctorTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
   }
 
   private _doRefresh(): void {
+    if (this.loading) return;
     this.loading = true;
     this._onDidChange.fire();
     this.lastRefresh = Date.now();
     this._fetch().then(items => {
       this.cached = items;
+    }).catch(() => {
+      this.cached = [this._action("Failed to run doctor", "imde.doctor", "open env")];
+    }).finally(() => {
+      this.loaded = true;
       this.loading = false;
       this._onDidChange.fire();
     });
@@ -48,6 +52,7 @@ export class DoctorTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem { return element; }
 
   getChildren(): vscode.TreeItem[] {
+    if (!this.loaded && !this.loading) this._doRefresh();
     if (this.loading) {
       const ti = new vscode.TreeItem("Refreshing environment...");
       ti.iconPath = new vscode.ThemeIcon("loading~spin");
@@ -58,7 +63,7 @@ export class DoctorTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 
   private async _fetch(): Promise<vscode.TreeItem[]> {
     const data = await this.runner.captureJson("doctor");
-    if (!data?.checks) return [this._error("Failed to run doctor")];
+    if (!data?.checks) return [this._action("Failed to run doctor", "imde.doctor", "open env")];
 
     const c = data.checks;
     const items: vscode.TreeItem[] = [];
@@ -94,6 +99,13 @@ export class DoctorTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
   private _error(msg: string): vscode.TreeItem {
     const ti = new vscode.TreeItem(msg);
     ti.iconPath = new vscode.ThemeIcon("warning");
+    return ti;
+  }
+
+  private _action(msg: string, command: string, description: string): vscode.TreeItem {
+    const ti = this._error(msg);
+    ti.description = description;
+    ti.command = { command, title: description };
     return ti;
   }
 }

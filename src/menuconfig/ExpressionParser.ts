@@ -273,25 +273,6 @@ export class ExpressionParser {
     }
     
     /**
-     * Check if an expression is a pure negation (e.g., !A or !A && !B).
-     * Used to determine if an if block should be flattened.
-     */
-    isPureNegation(expr: ExprNode): boolean {
-        switch (expr.type) {
-            case ExprType.NOT:
-                return true;
-                
-            case ExprType.AND:
-                // All operands must be negations
-                return (expr.left ? this.isPureNegation(expr.left) : true) &&
-                       (expr.right ? this.isPureNegation(expr.right) : true);
-                       
-            default:
-                return false;
-        }
-    }
-    
-    /**
      * Convert an expression node back to string (for debugging).
      */
     toString(expr: ExprNode): string {

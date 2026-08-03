@@ -13,11 +13,11 @@
  */
 
 import * as vscode from 'vscode';
-// import { Logger } from '../logger/logger';
+import { KconfigSessionCache } from './KconfigSessionCache';
 
 export class FileWatcher {
     private static instance: FileWatcher | undefined;
-    private fileWatcher: vscode.FileSystemWatcher | undefined;
+    private fileWatchers: vscode.FileSystemWatcher[] = [];
     private context: vscode.ExtensionContext;
     private ignoreNextChangeTimestamp: number = 0;
 
@@ -44,62 +44,79 @@ export class FileWatcher {
             return;
         }
 
-        // Watch for kconfig and defconfig file changes
-        const configPattern = new vscode.RelativePattern(workspaceFolder, '**/{sdkconfig,defconfig,.config}');
-        this.fileWatcher = vscode.workspace.createFileSystemWatcher(configPattern);
+        const configPattern = new vscode.RelativePattern(workspaceFolder, '**/{sdkconfig,defconfig,.config,*_defconfig}');
+        const kconfigPattern = new vscode.RelativePattern(workspaceFolder, '**/{Kconfig,Kconfig.*}');
 
-        // Handle file creation
-        this.fileWatcher.onDidCreate((uri) => {
-            // Logger.info(`Configuration file created: ${uri.fsPath}`);
-
-            // 检查是否应该忽略这次创建（内部保存操作触发的）
-            if (Date.now() < this.ignoreNextChangeTimestamp) {
-                // Logger.info(`Ignoring file creation notification for internal save: ${uri.fsPath}`);
-                return;
-            }
-
-            this.handleConfigFileChange(uri);
-        });
-
-        // Handle file changes
-        this.fileWatcher.onDidChange((uri) => {
-            // Logger.info(`Configuration file changed: ${uri.fsPath}`);
-            this.handleConfigFileChange(uri);
-        });
-
-        // Handle file deletion
-        this.fileWatcher.onDidDelete((_uri) => {
-            // Logger.info(`Configuration file deleted: ${_uri.fsPath}`);
-
-            // 检查是否应该忽略这次删除（内部 reset 操作触发的）
-            if (Date.now() < this.ignoreNextChangeTimestamp) {
-                // Logger.info(`Ignoring file deletion notification for internal reset: ${_uri.fsPath}`);
-                return;
-            }
-
-            vscode.window.showWarningMessage('Configuration file has been deleted.');
-        });
-
-        this.context.subscriptions.push(this.fileWatcher);
+        this.registerWatcher(configPattern, (uri) => this.handleConfigFileChange(uri));
+        this.registerWatcher(kconfigPattern, (uri) => this.handleKconfigFileChange(uri));
     }
 
-    private handleConfigFileChange(_uri: vscode.Uri) {
-        // 检查是否应该忽略这次变化（内部保存触发的）
+    private registerWatcher(pattern: vscode.GlobPattern, onChange: (uri: vscode.Uri) => void): void {
+        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        watcher.onDidCreate((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+
+        watcher.onDidChange((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+
+        watcher.onDidDelete((uri) => {
+            if (Date.now() < this.ignoreNextChangeTimestamp) {
+                return;
+            }
+            onChange(uri);
+        });
+
+        this.fileWatchers.push(watcher);
+        this.context.subscriptions.push(watcher);
+    }
+
+    private getFileName(uri: vscode.Uri): string {
+        return uri.fsPath.split(/[\\/]/).pop() || 'Unknown';
+    }
+
+    private handleConfigFileChange(uri: vscode.Uri) {
         if (Date.now() < this.ignoreNextChangeTimestamp) {
-            // Logger.info(`Ignoring file change notification for internal save: ${_uri.fsPath}`);
             return;
         }
 
-        // 只有外部修改时才通知
-        const fileName = _uri.fsPath.split('/').pop() || 'Unknown';
+        const fileName = this.getFileName(uri);
         vscode.window.showInformationMessage(
             `Configuration file ${fileName} has been modified externally.`
         );
     }
 
+    private handleKconfigFileChange(uri: vscode.Uri): void {
+        if (Date.now() < this.ignoreNextChangeTimestamp) {
+            return;
+        }
+
+        KconfigSessionCache.clearHotCache();
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        if (workspaceFolder) {
+            const cache = new KconfigSessionCache(workspaceFolder.uri.fsPath);
+            void cache.invalidate();
+        }
+
+        const fileName = this.getFileName(uri);
+        vscode.window.showInformationMessage(
+            `Kconfig file ${fileName} has changed. Refresh GUI Config to reload the menu tree.`
+        );
+    }
+
     public dispose() {
-        if (this.fileWatcher) {
-            this.fileWatcher.dispose();
+        this.fileWatchers.forEach((watcher) => watcher.dispose());
+        this.fileWatchers = [];
+        if (FileWatcher.instance === this) {
+            FileWatcher.instance = undefined;
         }
     }
 }

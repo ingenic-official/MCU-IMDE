@@ -45,6 +45,7 @@ export interface ConditionNode {
  */
 export class ConditionEvaluator {
     private static readonly MAX_RESULT_CACHE_SIZE = 20000;
+    private static readonly MAX_AST_CACHE_SIZE = 5000;
     private context: ConfigContext;
     private astCache: Map<string, ConditionNode> = new Map();
     private expressionVariableDeps: Map<string, string[]> = new Map();
@@ -123,6 +124,14 @@ export class ConditionEvaluator {
         }
     }
 
+    private setAstCache(key: string, node: ConditionNode): void {
+        if (this.astCache.size >= ConditionEvaluator.MAX_AST_CACHE_SIZE) {
+            this.astCache.clear();
+            this.expressionVariableDeps.clear();
+        }
+        this.astCache.set(key, node);
+    }
+
     /**
      * Parse condition expression into AST
      */
@@ -136,7 +145,7 @@ export class ConditionEvaluator {
                 literalKind: 'boolean',
                 rawValue: 'true'
             };
-            this.astCache.set(normalized, literalTrue);
+            this.setAstCache(normalized, literalTrue);
             this.expressionVariableDeps.set(normalized, []);
             return literalTrue;
         }
@@ -154,7 +163,7 @@ export class ConditionEvaluator {
                 left: this.parseExpression(orMatch.left),
                 right: this.parseExpression(orMatch.right)
             };
-            this.astCache.set(normalized, result);
+            this.setAstCache(normalized, result);
             this.expressionVariableDeps.set(normalized, this.collectVariableDeps(result));
             return result;
         }
@@ -167,7 +176,7 @@ export class ConditionEvaluator {
                 left: this.parseExpression(andMatch.left),
                 right: this.parseExpression(andMatch.right)
             };
-            this.astCache.set(normalized, result);
+            this.setAstCache(normalized, result);
             this.expressionVariableDeps.set(normalized, this.collectVariableDeps(result));
             return result;
         }
@@ -178,7 +187,7 @@ export class ConditionEvaluator {
                 type: 'NOT',
                 left: this.parseExpression(normalized.substring(1).trim())
             };
-            this.astCache.set(normalized, result);
+            this.setAstCache(normalized, result);
             this.expressionVariableDeps.set(normalized, this.collectVariableDeps(result));
             return result;
         }
@@ -192,14 +201,14 @@ export class ConditionEvaluator {
                 right: this.parseExpression(comparisonMatch.right),
                 operator: comparisonMatch.operator as any
             };
-            this.astCache.set(normalized, result);
+            this.setAstCache(normalized, result);
             this.expressionVariableDeps.set(normalized, this.collectVariableDeps(result));
             return result;
         }
 
         // Parse literals and variables
         const literalNode = this.parseLiteral(normalized);
-        this.astCache.set(normalized, literalNode);
+        this.setAstCache(normalized, literalNode);
         this.expressionVariableDeps.set(normalized, this.collectVariableDeps(literalNode));
         return literalNode;
     }

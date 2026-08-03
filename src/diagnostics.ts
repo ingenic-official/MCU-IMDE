@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 
 interface ParsedError {
   file: string;
@@ -211,9 +212,7 @@ export class BuildErrorParser {
     if (filePath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(filePath)) {
       return filePath;
     }
-    // Resolve relative to workspace root
-    const { resolve } = require("path");
-    return resolve(root, filePath);
+    return path.resolve(root, filePath);
   }
 }
 
