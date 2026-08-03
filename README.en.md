@@ -73,14 +73,14 @@ IMDE: Build
 
 ```mermaid
 flowchart LR
-    A[SDK workspace<br/>imde.json] --> B[IMDE VS Code extension]
-    B --> C[Environment checks<br/>Doctor]
-    B --> D[Configuration and builds<br/>Defconfig / Configure / Build]
-    B --> E[Visual tools<br/>GUI Config / Pinmux]
-    D --> F[Build artifacts]
-    F --> G[Artifacts / Memory Map]
-    D --> H[compile_commands.json]
-    H --> I[IntelliSense]
+    A["SDK workspace imde.json"] --> B["IMDE VS Code extension"]
+    B --> C["Environment checks Doctor"]
+    B --> D["Configuration and builds Defconfig / Configure / Build"]
+    B --> E["Visual tools GUI Config / Pinmux"]
+    D --> F["Build artifacts"]
+    F --> G["Artifacts / Memory Map"]
+    D --> H["compile_commands.json"]
+    H --> I["IntelliSense"]
 ```
 
 ## Common Commands

@@ -72,14 +72,14 @@ IMDE: Build
 
 ```mermaid
 flowchart LR
-    A[SDK 工程<br/>imde.json] --> B[IMDE VS Code 扩展]
-    B --> C[环境检查<br/>Doctor]
-    B --> D[配置与构建<br/>Defconfig / Configure / Build]
-    B --> E[图形工具<br/>GUI Config / Pinmux]
-    D --> F[构建产物]
-    F --> G[Artifacts / Memory Map]
-    D --> H[compile_commands.json]
-    H --> I[IntelliSense]
+    A["SDK 工程 imde.json"] --> B["IMDE VS Code 扩展"]
+    B --> C["环境检查 Doctor"]
+    B --> D["配置与构建 Defconfig / Configure / Build"]
+    B --> E["图形工具 GUI Config / Pinmux"]
+    D --> F["构建产物"]
+    F --> G["Artifacts / Memory Map"]
+    D --> H["compile_commands.json"]
+    H --> I["IntelliSense"]
 ```
 
 ## 常用命令
