@@ -505,7 +505,7 @@ export function activate(context: vscode.ExtensionContext) {
       try {
         const mapData = await getCachedMapData(filePath);
         const { MapViewPanel } = await import("./mapview/panel");
-        MapViewPanel.createOrShow(context.extensionUri, filePath, mapData, runner.getProjectDir());
+        MapViewPanel.createOrShow(filePath, mapData, runner.getProjectDir());
       } catch (err: any) {
         vscode.window.showErrorMessage(`Failed to parse map file: ${err.message}`);
       }

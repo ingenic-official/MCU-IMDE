@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -90,7 +89,7 @@ export function parseCompileCommands(
         : compiler;
     }
 
-    const tokens = extractTokens(entry, cwd);
+    const tokens = extractTokens(entry);
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
       if (token === "-I" || token === "-isystem" || token === "/I") {
@@ -131,10 +130,6 @@ export function parseCompileCommands(
     const m = cStd.match(/^(?:gnu)?(\d+)/);
     if (m) cStandard = `c${m[1]}`;
   }
-  const cppStd =
-    stdList.find(s => s.startsWith("c++")) ||
-    stdList.find(s => s.startsWith("gnu++"));
-
   // Determine IntelliSense mode
   const intelliSenseMode = compilerPath.includes("riscv")
     ? "linux-gcc-riscv32"
@@ -152,7 +147,7 @@ export function parseCompileCommands(
   };
 }
 
-function extractTokens(entry: CompileCommand, cwd: string): string[] {
+function extractTokens(entry: CompileCommand): string[] {
   if (entry.arguments && entry.arguments.length > 0) {
     return entry.arguments.slice(1); // skip compiler path
   }

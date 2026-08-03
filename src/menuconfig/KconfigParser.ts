@@ -53,7 +53,6 @@ export class KconfigParser {
 
     // Performance optimization: File caching
     private fileContentCache: Map<string, string[]> = new Map();
-    private expandedVariableCache: Map<string, string> = new Map();
     private allParsedFiles: Set<string> = new Set();
     private dependencyExprCache: Map<string, ReturnType<ExpressionParser["parse"]>> = new Map();
     private scheduledPrefetchFiles: Set<string> = new Set();
@@ -1837,7 +1836,7 @@ export class KconfigParser {
             return value;
         }
 
-        const replace = (match: string, p1?: string, p2?: string): string => {
+        const replace = (_match: string, p1?: string, p2?: string): string => {
             const varName = (p1 || p2 || '').trim();
             if (!varName) {
                 return '';

@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref, type ComputedRef } from "vue";
+import { computed, ref, watch, type ComputedRef } from "vue";
 import type { Menu } from "../../../../../menuconfig/Menu";
 
 type TriValue = "n" | "m" | "y";

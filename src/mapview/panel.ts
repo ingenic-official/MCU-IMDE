@@ -16,7 +16,7 @@ export class MapViewPanel {
   private readonly panel: vscode.WebviewPanel;
   private _disposed = false;
 
-  public static createOrShow(extensionUri: vscode.Uri, mapPath: string, data: MapParseResult, projDir?: string) {
+  public static createOrShow(mapPath: string, data: MapParseResult, projDir?: string) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
@@ -26,11 +26,11 @@ export class MapViewPanel {
       MapViewPanel.currentPanel.update(mapPath, data, projDir);
       return;
     }
-    MapViewPanel.currentPanel = new MapViewPanel(extensionUri, column || vscode.ViewColumn.One, title, mapPath, data, projDir);
+    MapViewPanel.currentPanel = new MapViewPanel(column || vscode.ViewColumn.One, title, mapPath, data, projDir);
   }
 
   private constructor(
-    extensionUri: vscode.Uri, column: vscode.ViewColumn,
+    column: vscode.ViewColumn,
     title: string, mapPath: string, data: MapParseResult, projDir?: string,
   ) {
     this.panel = vscode.window.createWebviewPanel("imdeMapView", title, column, {

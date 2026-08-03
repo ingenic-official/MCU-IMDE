@@ -16,14 +16,10 @@ interface ParsedError {
 export class BuildErrorParser {
   // GCC/Clang: file:line:col: error/warning/fatal error: message
   private static readonly GCC_ERROR = /^(.+?):(\d+):(\d+):\s+(fatal |)(error|warning):\s+(.+)$/;
-  // GCC note (follows error): file:line:col: note: message
-  private static readonly GCC_NOTE = /^(.+?):(\d+):(\d+):\s+note:\s+(.+)$/;
   // CMake: CMake Error/Warning at file:line
   private static readonly CMAKE_ERROR = /^\s*CMake (Error|Warning) at (.+?):(\d+)/;
   // Ninja: FAILED: target
   private static readonly NINJA_ERROR = /^FAILED:\s+(.+)$/;
-  // Linker/file.o:line: error: message
-  private static readonly LD_ERROR = /^(.+?):(\d+):\s+(error|warning):\s+(.+)$/;
   // Python traceback: File "path", line N, in ...
   private static readonly PYTHON_ERROR = /^\s*File\s+"(.+?)",\s+line\s+(\d+)/;
   // Python Exception/Error (last line of traceback)

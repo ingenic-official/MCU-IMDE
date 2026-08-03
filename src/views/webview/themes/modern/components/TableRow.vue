@@ -62,8 +62,6 @@ const canToggleMenu = computed(() => {
   return props.row.hasChildren === true;
 });
 
-type TriValue = "n" | "m" | "y";
-
 const isReadonly = computed(() => props.row.item.isReadonly === true);
 
 const {

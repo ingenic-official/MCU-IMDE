@@ -1976,28 +1976,6 @@ export class VisibilityManager {
     }
 
     /**
-     * Find all configs that select the given menu item
-     */
-    private findSelectorsForItem(targetMenu: Menu): void {
-        const searchForSelectors = (menu: Menu) => {
-            // Check if this menu selects the target
-            if (menu.select && menu.select.includes(targetMenu.name)) {
-                if (!targetMenu.selectedBy.includes(menu.name)) {
-                    targetMenu.selectedBy.push(menu.name);
-                }
-            }
-            
-            // Search in children
-            if (menu.children) {
-                menu.children.forEach(searchForSelectors);
-            }
-        };
-        
-        this.allMenus.forEach(searchForSelectors);
-    }
-
-
-    /**
      * 判断一个带有 select 的“选择器”是否有效启用（匹配 Kconfiglib tri_value 语义的关键部分）
      * 规则：
      * - 必须是布尔类型；
