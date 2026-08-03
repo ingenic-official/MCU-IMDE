@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as assert from "assert";
 
-const fixture = fs.readFileSync(path.join(__dirname, "fixture.map"), "utf-8");
+const fixture = fs.readFileSync(path.join(__dirname, "fixtures", "map-view.fixture"), "utf-8");
 const result: MapParseResult = parseMapFile(fixture);
 
 let passed = 0, failed = 0;

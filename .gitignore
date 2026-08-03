@@ -1,10 +1,15 @@
 node_modules/
+dist/
 out/
 *.vsix
 *.tgz
 *.tsbuildinfo
 npm-debug.log*
-dist/**/*.map
+yarn-debug.log*
+yarn-error.log*
+coverage/
+.DS_Store
+Thumbs.db
 
 # Local screenshots and manual references
 现状.png
