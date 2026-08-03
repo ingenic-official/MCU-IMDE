@@ -1,4 +1,4 @@
-import { computed, ref, watch, nextTick, onMounted, type Ref, type ComputedRef } from "vue";
+import { computed, ref, watch, nextTick, onMounted, type ComputedRef } from "vue";
 import type { Menu } from "../../../../../menuconfig/Menu";
 
 export function useChoiceWidth(isChoiceRow: ComputedRef<boolean>, item: ComputedRef<Menu>) {

@@ -108,6 +108,11 @@ module.exports = (env, argv) => {
             loader: 'ts-loader',
             options: {
               appendTsSuffixTo: [/\.vue$/],
+              // Vue compiler macros erase type-only prop declarations before ts-loader checks them.
+              compilerOptions: {
+                noUnusedLocals: false,
+                noUnusedParameters: false,
+              },
             },
           },
           exclude: /node_modules/,

@@ -41,15 +41,17 @@ The debug configurations build the extension first and use `dist/` source maps.
 
 ```bash
 npm test
+npm run typecheck
 npm run check
 npm run package:dry
 npm run verify
 ```
 
 `npm test` runs parser, diagnostics, IntelliSense, Kconfig, and Pinmux tests.
-`npm run check` performs a development webpack build. `npm run package:dry`
-prints the files that will be included in the VSIX package. `npm run verify`
-runs all three checks in CI order.
+`npm run typecheck` checks extension and test TypeScript with unused-code
+validation. `npm run check` performs a development webpack build.
+`npm run package:dry` prints the files that will be included in the VSIX
+package. `npm run verify` runs all checks in CI order.
 
 ## Package
 

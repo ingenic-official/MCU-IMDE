@@ -72,13 +72,11 @@ export class KconfigServer extends EventEmitter {
     private static instance: KconfigServer | null = null;
     
     private serverProcess: ChildProcess | null = null;
-    private receivedDataBuffer: string = "";
     private kconfigMenus: Menu[] = [];
     private defaultValues: Map<string, any> = new Map();
     private workspaceFolder: vscode.Uri;
     private kconfigFile: string;
     private configFile: string;
-    private isRunning: boolean = false;
     private unsavedChanges: boolean = false;
     private visibilityManager: VisibilityManager;
     private kconfigWriter: KconfigWriter;
@@ -125,8 +123,6 @@ export class KconfigServer extends EventEmitter {
         // For now, use a simple implementation that reads Kconfig files directly
         // In the future, this could be replaced with a Python-based Kconfig server
         // using kconfiglib or similar tools
-        
-        this.isRunning = true;
         
         // Load Kconfig structure using the specific file
         const targetFile = vscode.Uri.file(this.kconfigFile);
@@ -397,10 +393,6 @@ export class KconfigServer extends EventEmitter {
         }
     }
     
-    private updateMenuValueByName(name: string, value: string): boolean {
-        return this.updateIndexedMenuValues(name, value);
-    }
-    
     private async resolveHeaderPath(): Promise<string | null> {
         const config = vscode.workspace.getConfiguration("imde.guiConfig");
         let headerPath = config.get<string>("autoHeaderPath", "")?.trim() || "";
@@ -450,43 +442,6 @@ export class KconfigServer extends EventEmitter {
         return JSON.parse(JSON.stringify(menus)) as Menu[];
     }
 
-    /**
-     * Find a menu by its symbol name in the current menu tree
-     */
-    private findMenuByName(name: string): Menu | null {
-        const dfs = (menus: Menu[]): Menu | null => {
-            for (const m of menus) {
-                if (m.name === name) return m;
-                if (m.children && m.children.length > 0) {
-                    const found = dfs(m.children);
-                    if (found) return found;
-                }
-            }
-            return null;
-        };
-        return dfs(this.kconfigMenus);
-    }
-    
-    /**
-     * Format a single config as a C #define statement
-     * (deprecated: retained for backward compatibility)
-     */
-
-    /**
-     * Escapes string for .config file output, matching Kconfiglib behavior
-     * Backslashes must be escaped before quotes to avoid double escaping
-     */
-    private findParentChoice(childName: string): Menu | null {
-        const byName = this.menuNameIndex.get(childName) || [];
-        for (const target of byName) {
-            const parentChoice = this.choiceParentByChildId.get(target.id);
-            if (parentChoice) {
-                return parentChoice;
-            }
-        }
-        return null;
-    }
-    
     private rebuildMenuCaches(): void {
         const nextIndex = new Map<string, Menu>();
         const nextNameIndex = new Map<string, Menu[]>();
@@ -738,7 +693,6 @@ export class KconfigServer extends EventEmitter {
             this.serverProcess.kill();
             this.serverProcess = null;
         }
-        this.isRunning = false;
         this.removeAllListeners();
         
         if (KconfigServer.instance === this) {

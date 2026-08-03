@@ -3,7 +3,7 @@ import * as path from "path";
 import { BoardPinmuxConfiguration, generateBoardPinmuxSource, generateBoardPinsHeader } from "./boardGenerator";
 import { BoardPinmuxDocument, parseBoardPinmux } from "./boardParser";
 import { createPinmuxBoard, validateBoardId, writePinmuxFiles } from "./boardWorkspace";
-import { PinmuxDefinition, PinmuxFunction, PinmuxPin } from "./types";
+import { PinmuxDefinition } from "./types";
 
 interface PanelData {
   definition: PinmuxDefinition;

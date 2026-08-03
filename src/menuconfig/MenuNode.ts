@@ -184,16 +184,4 @@ export class MenuNode {
         }
     }
     
-    /**
-     * Debug helper: Print the tree structure.
-     */
-    printTree(indent: number = 0): void {
-        const _prefix = '  '.repeat(indent);
-        
-        let child = this.list;
-        while (child) {
-            child.printTree(indent + 1);
-            child = child.next;
-        }
-    }
 }

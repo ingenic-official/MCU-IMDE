@@ -403,18 +403,6 @@ export class MenuconfigPanel {
     }
   }
   
-  private getExtensionPath(): string {
-    // Get extension path from webview URI
-    const scriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.file(path.join("dummy"))
-    ).toString();
-    const match = scriptUri.match(/^.*\/([a-z0-9-]+)\/dummy$/);
-    if (match) {
-      return path.dirname(path.dirname(scriptUri.replace(/^.*\/\//, "")));
-    }
-    return "";  
-  }
-  
   private async initializeKconfigServer(): Promise<void> {
     const initToken = ++this.initializationToken;
     const initStartedAt = Date.now();

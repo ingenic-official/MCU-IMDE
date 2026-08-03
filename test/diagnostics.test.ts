@@ -1,13 +1,12 @@
 // Override vscode module resolution before imports
 const Module = require("module");
 const origResolve = Module._resolveFilename;
-Module._resolveFilename = function (request: string, parent: any) {
+Module._resolveFilename = function (request: string, _parent: any) {
   if (request === "vscode") return require("path").join(__dirname, "vscode-mock.ts");
   return origResolve.apply(this, arguments as any);
 };
 
 import { BuildErrorParser } from "../src/diagnostics";
-import * as assert from "assert";
 
 const root = "/workspace";
 let passed = 0, failed = 0;

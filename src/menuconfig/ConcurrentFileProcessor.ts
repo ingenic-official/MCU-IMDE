@@ -23,7 +23,6 @@ import { Logger } from "../logger/logger";
 export class ConcurrentFileProcessor {
     private static readonly DEFAULT_CONCURRENCY_LIMIT = 100;  // 增加并发限制以提高性能
     private static readonly MAX_RETRIES = 3;
-    private static readonly OPTIMAL_BATCH_SIZE = 200;  // 优化的批次大小
     
     private concurrencyLimit: number;
     private fileContentCache: Map<string, string> = new Map();
@@ -39,8 +38,6 @@ export class ConcurrentFileProcessor {
      * @returns Promise<Map<string, string>> 文件路径到内容的映射
      */
     public async readFilesAsync(filePaths: string[]): Promise<Map<string, string>> {
-        const _startTime = Date.now();
-        
         const results = new Map<string, string>();
         
         // 创建分块处理，避免过多并发导致系统资源耗尽
@@ -64,11 +61,6 @@ export class ConcurrentFileProcessor {
             });
         }
         
-        const totalTime = Date.now() - _startTime;
-        const successCount = results.size;
-        const _avgTime = successCount > 0 ? (totalTime / successCount).toFixed(1) : 0;
-        
-        
         return results;
     }
     
@@ -78,13 +70,8 @@ export class ConcurrentFileProcessor {
      * @returns Promise<Map<string, string>> 文件路径到内容的映射
      */
     public async processGlobPattern(globPattern: string): Promise<Map<string, string>> {
-        const _startTime = Date.now();
-        
         try {
             const matchedFiles = (await glob(globPattern, { nodir: true })).sort();
-            const _globTime = Date.now() - _startTime;
-            
-            
             if (matchedFiles.length === 0) {
                 Logger.warn(`[CONCURRENT_PROCESSOR] Glob 模式未匹配到任何文件: ${globPattern}`);
                 return new Map();
