@@ -1,7 +1,7 @@
 {
   "name": "imde",
   "displayName": "IMDE",
-  "description": "Ingenic MCU Development Environment — VS Code integration",
+  "description": "Ingenic MCU Development Environment for VS Code",
   "version": "0.3.6",
   "publisher": "ingenic",
   "license": "ISC",
@@ -9,8 +9,23 @@
     "type": "git",
     "url": "https://github.com/trevisy/IMDE.git"
   },
-  "sideEffects": ["*.scss", "*.css", "*.vue"],
-  "icon": "icon.png",
+  "homepage": "https://github.com/trevisy/IMDE#readme",
+  "bugs": {
+    "url": "https://github.com/trevisy/IMDE/issues"
+  },
+  "keywords": [
+    "ingenic",
+    "mcu",
+    "embedded",
+    "kconfig",
+    "pinmux"
+  ],
+  "sideEffects": [
+    "*.scss",
+    "*.css",
+    "*.vue"
+  ],
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -128,7 +143,7 @@
         {
           "id": "imde-sidebar",
           "title": "IMDE",
-          "icon": "logo/ingenic_blue.svg"
+          "icon": "media/ingenic_blue.svg"
         }
       ]
     },
@@ -239,6 +254,7 @@
     "compile": "webpack --mode development",
     "check": "webpack --mode development",
     "watch": "webpack --mode development --watch",
+    "verify": "npm run check && npm test && npm run package:dry",
     "test": "npm run test:parser && npm run test:kconfig && npm run test:diag && npm run test:intellisense && npm run test:pinmux && npm run test:board-pinmux",
     "test:parser": "npx ts-node --project test/tsconfig.json test/parser.test.ts",
     "test:kconfig": "npx ts-node --project test/tsconfig.json test/kconfig.test.ts",
@@ -263,6 +279,7 @@
     "sass-loader": "^13.3.2",
     "stream-browserify": "^3.0.0",
     "ts-loader": "^9.3.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.0",
     "vue-loader": "^17.2.2",
     "vue-style-loader": "^4.1.3",

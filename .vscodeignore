@@ -1,6 +1,9 @@
+.github/**
 .vscode/**
+docs/**
 src/**
 test/**
+.editorconfig
 .gitignore
 tsconfig.json
 node_modules/**
@@ -8,7 +11,7 @@ node_modules/**
 *.tgz
 *.tsbuildinfo
 dist/**/*.map
-icon.svg
+media/icon.svg
 现状.png
 guiconfig.png
 package-lock.json
