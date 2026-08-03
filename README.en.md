@@ -1,45 +1,131 @@
-# IMDE
+<div align="center">
+  <img src="media/ingenic_blue.svg" width="96" alt="IMDE logo">
 
-[简体中文](README.md) | English
+  <h1>IMDE</h1>
 
-[![CI](https://github.com/trevisy/IMDE/actions/workflows/ci.yml/badge.svg)](https://github.com/trevisy/IMDE/actions/workflows/ci.yml)
+  <p><strong>A VS Code development environment extension for Ingenic MCU SDK projects</strong></p>
 
-IMDE is a VS Code extension for Ingenic MCU SDK projects. It integrates the
-SDK's local `tools/imde/imde.py` command-line interface into VS Code so that
-common development tasks are available in one workspace.
+  <p>
+    <a href="README.md">简体中文</a> | English
+  </p>
 
-## Features
+  <p>
+    <a href="https://github.com/trevisy/IMDE/actions/workflows/ci.yml"><img src="https://github.com/trevisy/IMDE/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://code.visualstudio.com/"><img src="https://img.shields.io/badge/VS%20Code-%3E%3D1.85-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code 1.85+"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-ISC-0B6BCB" alt="ISC License"></a>
+  </p>
 
-- Environment diagnostics and SDK toolchain checks.
-- Configure, build, clean, full-clean, and defconfig workflows.
-- GUI configuration for Kconfig-based projects.
-- Pinmux and BSP configuration tools.
-- Build artifact browsing and interactive memory-map viewing.
-- IntelliSense setup from generated compilation data.
+  <p>
+    <a href="https://github.com/trevisy/IMDE/releases/latest">Latest release</a>
+    &nbsp;|&nbsp;
+    <a href="#quick-start">Quick start</a>
+    &nbsp;|&nbsp;
+    <a href="docs/development.md">Development guide</a>
+    &nbsp;|&nbsp;
+    <a href="docs/architecture.md">Architecture</a>
+  </p>
+</div>
 
-## Requirements
+---
 
-- VS Code 1.85 or later.
-- An Ingenic MCU SDK workspace containing `imde.json`.
-- The SDK dependencies reported by `IMDE: Run Doctor`, including Python,
-  CMake, Ninja, and the configured toolchain.
+IMDE integrates the SDK's `tools/imde/imde.py` command-line interface into
+VS Code. For Ingenic MCU SDK workspaces containing `imde.json`, it brings
+environment checks, configuration, builds, Pinmux, Kconfig, artifact browsing,
+and memory-map analysis into one workspace.
 
-## Install
+## Why IMDE
+
+| Development area | What IMDE provides |
+| --- | --- |
+| Environment setup | `IMDE: Run Doctor` checks Python, CMake, Ninja, and toolchain status. |
+| Build configuration | Select defconfigs, then configure, build, clean, or full-clean. |
+| Visual configuration | Edit Kconfig through GUI Config while preserving dependency and visibility rules. |
+| Board development | Discover chips and BSPs, configure Pinmux, and generate board source files. |
+| Result analysis | Browse build artifacts and inspect ROM, RAM, modules, and source links in Memory Map. |
+| Code completion | Update C/C++ IntelliSense from `compile_commands.json`. |
+
+## Quick Start
+
+### 1. Install the extension
 
 1. Open the [latest release](https://github.com/trevisy/IMDE/releases/latest).
-2. Download the `imde-<version>.vsix` asset.
-3. In VS Code, run `Extensions: Install from VSIX...` and select the file.
-4. Open an SDK project and run `IMDE: Run Doctor` from the Command Palette.
+2. Download `imde-<version>.vsix`.
+3. Run `Extensions: Install from VSIX...` from the VS Code Command Palette.
+4. Select the VSIX and reload VS Code.
 
-## Everyday Workflow
+### 2. Open an SDK project
 
-1. Open an SDK project folder in VS Code.
-2. Use `IMDE: Run Doctor` to verify the environment.
-3. Select a defconfig, then run `IMDE: Configure`.
-4. Run `IMDE: Build` and inspect the generated artifacts in the IMDE sidebar.
+Open the SDK project folder containing `imde.json`, then run:
 
-The extension activates only for workspaces that contain `imde.json`. Use the
-`imde.projectDir` setting when the SDK project is not the workspace root.
+```text
+IMDE: Run Doctor
+```
+
+When Doctor succeeds, start with:
+
+```text
+IMDE: Select Defconfig
+IMDE: Configure
+IMDE: Build
+```
+
+## Workflow
+
+```mermaid
+flowchart LR
+    A[SDK workspace<br/>imde.json] --> B[IMDE VS Code extension]
+    B --> C[Environment checks<br/>Doctor]
+    B --> D[Configuration and builds<br/>Defconfig / Configure / Build]
+    B --> E[Visual tools<br/>GUI Config / Pinmux]
+    D --> F[Build artifacts]
+    F --> G[Artifacts / Memory Map]
+    D --> H[compile_commands.json]
+    H --> I[IntelliSense]
+```
+
+## Common Commands
+
+| Command | Purpose |
+| --- | --- |
+| `IMDE: Run Doctor` | Check the SDK project and host development environment. |
+| `IMDE: Select Defconfig` | Select and write the project defconfig. |
+| `IMDE: Configure` | Create or update the build directory. |
+| `IMDE: Build` | Build the current SDK project. |
+| `IMDE: GUI Config` | Open the visual Kconfig configuration interface. |
+| `IMDE: Pinmux` | Open the chip and BSP Pinmux configuration tool. |
+| `IMDE: View Map` | Open an interactive Memory Map for a build artifact. |
+| `IMDE: Setup IntelliSense` | Generate C/C++ IntelliSense settings from the compilation database. |
+
+<details>
+<summary><strong>Common settings</strong></summary>
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `imde.projectDir` | Empty | Set the SDK project path when it is not the workspace root. |
+| `imde.terminalName` | `IMDE` | Name shown for the integrated terminal. |
+| `imde.captureTimeoutMs` | `15000` | Timeout in milliseconds for short JSON commands used by views. |
+| `imde.commandTimeoutMs` | `0` | Timeout for non-interactive commands; `0` disables the limit. |
+| `imde.showOutputOnError` | `true` | Reveal the IMDE terminal when a managed command fails. |
+| `imde.guiConfig.autoHeaderPath` | Empty | Optional path for a C header generated by GUI Config. |
+
+</details>
+
+## Development
+
+```powershell
+npm ci
+npm run verify
+```
+
+`verify` runs strict type checks, webpack builds, automated tests, and VSIX
+content validation in sequence.
+
+| Document | Contents |
+| --- | --- |
+| [Development guide](docs/development.md) | Debugging, builds, tests, packaging, and releases. |
+| [Architecture](docs/architecture.md) | Extension host, webview, and feature-module boundaries. |
+| [Release checklist](docs/releasing.md) | Version and GitHub Release steps. |
+| [Changelog](CHANGELOG.md) | Version history and user-visible changes. |
 
 ## Repository Layout
 
@@ -47,7 +133,7 @@ The extension activates only for workspaces that contain `imde.json`. Use the
 .
 |- src/                 Extension TypeScript and webview source
 |- test/                Automated tests and reusable fixtures
-|- media/               Extension icons and branding assets
+|- media/               Runtime icon assets for the extension
 |- docs/                Development, architecture, and release documentation
 |- .github/             CI and contributor-facing GitHub configuration
 |- CHANGELOG.md         Version history
@@ -55,24 +141,15 @@ The extension activates only for workspaces that contain `imde.json`. Use the
 `- webpack.config.js    Extension and webview bundling configuration
 ```
 
-## Development
+## Contributing and Security
 
-```powershell
-npm ci
-npm run compile
-npm test
-```
-
-See the [development documentation](docs/development.md) for debugging,
-packaging, and the complete validation workflow. The design overview is in the
-[architecture documentation](docs/architecture.md).
-
-## Contributing
-
-Bug reports and feature requests are welcome through GitHub Issues. Please
-read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Security
-issues should follow [SECURITY.md](SECURITY.md).
+Bug reports and feature requests are welcome through GitHub Issues. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Do not report
+security issues publicly; follow the private reporting process in
+[SECURITY.md](SECURITY.md).
 
 ## License
 
 This project is distributed under the [ISC License](LICENSE).
+
+<p align="right"><a href="#imde">Back to top</a></p>
