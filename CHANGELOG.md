@@ -28,6 +28,7 @@
 - 修复 `choice` 内通过 `source` 引入的选项未解析，以及旧会话缓存持续保留空选项的问题。
 - Helper 展开中区分 `Direct depends on` 与 `Effective visibility`，避免局部依赖和继承条件混在一起显示。
 - 增加 Kconfig 解析测试覆盖。
+- 修复同时启用多个 Filesystem Types 后 GUI Config 因折叠子项参与虚拟滚动计算而出现空白或错位的问题。
 
 ### IMDE Terminal
 - Build / Configure / Clean / FullClean 改回共享 VS Code 集成终端 `IMDE`。

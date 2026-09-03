@@ -118,24 +118,28 @@ const VIRTUAL_THRESHOLD = 200;
 let scrollRaf: number | null = null;
 let resizeObs: ResizeObserver | null = null;
 
-const useVirtualScroll = computed(() => displayRows.value.length > VIRTUAL_THRESHOLD);
+// Collapsed descendants have zero layout height (TableRow applies row-hidden),
+// so they must not participate in the fixed-height virtual scroll index.
+const virtualRows = computed(() => displayRows.value.filter((row) => !row.hidden));
+
+const shouldVirtualize = computed(() => virtualRows.value.length > VIRTUAL_THRESHOLD);
 
 const virtualStart = computed(() => {
-  if (!useVirtualScroll.value) return 0;
+  if (!shouldVirtualize.value) return 0;
   return Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - VIRTUAL_BUFFER);
 });
 
 const virtualEnd = computed(() => {
-  if (!useVirtualScroll.value) return displayRows.value.length;
-  return Math.min(displayRows.value.length, Math.ceil((scrollTop.value + containerHeight.value) / ROW_HEIGHT) + VIRTUAL_BUFFER);
+  if (!shouldVirtualize.value) return virtualRows.value.length;
+  return Math.min(virtualRows.value.length, Math.ceil((scrollTop.value + containerHeight.value) / ROW_HEIGHT) + VIRTUAL_BUFFER);
 });
 
 const virtualPaddingTop = computed(() => virtualStart.value * ROW_HEIGHT);
-const virtualPaddingBottom = computed(() => (displayRows.value.length - virtualEnd.value) * ROW_HEIGHT);
+const virtualPaddingBottom = computed(() => (virtualRows.value.length - virtualEnd.value) * ROW_HEIGHT);
 
 const visibleRows = computed(() => {
-  if (!useVirtualScroll.value) return displayRows.value;
-  return displayRows.value.slice(virtualStart.value, virtualEnd.value);
+  if (!shouldVirtualize.value) return displayRows.value;
+  return virtualRows.value.slice(virtualStart.value, virtualEnd.value);
 });
 
 function onTableScroll() {
@@ -551,7 +555,7 @@ function retryLoading() {
         <div class="table-header-cell value-col">Value</div>
       </div>
       <div class="table-body" ref="tableBodyRef" @scroll="onTableScroll">
-        <template v-if="useVirtualScroll">
+        <template v-if="shouldVirtualize">
           <div
             :style="{
               paddingTop: `${virtualPaddingTop}px`,
