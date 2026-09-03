@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.7 (stable) — 2026.09.03
+
+### GUI Config 与 IMDE 集成
+- GUI Config 自动发现可选的 `imde-extension.json`，并加载扩展 Kconfig。
+- 没有扩展时继续使用项目根 Kconfig，不显示测试库配置。
+- 修复 GUI Config 对项目根 `.config` 的检测路径，兼容当前 SDK 工程布局。
+- IMDE 命令调用兼容 `--object default` 和尾部对象参数。
+- 组合 Kconfig 使用项目根作为 `srctree`，保证扩展中的 `source` 路径正常解析。
+
 ## 0.3.6 (stable) — 2026.07.22
 
 ### Pinmux 与 BSP

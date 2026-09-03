@@ -113,16 +113,16 @@ function selectionArgs(record: DefconfigRecord, source: string): { args: string[
   const relative = record.rootRelativePath || record.token;
   if (source === "test" && record.microchip) {
     const config = withoutPrefix(relative, record.microchip);
-    return { args: ["--reconfigure", source, record.microchip, config], label: config };
+    return { args: ["--reconfigure", "--object", "default", source, record.microchip, config], label: config };
   }
   if (source === "test") {
-    return { args: ["--reconfigure", record.token], label: record.token };
+    return { args: ["--reconfigure", "--object", "default", record.token], label: record.token };
   }
 
   const config = record.boardFamily && normalizedRoot(record) === "config"
     ? withoutPrefix(relative, record.boardFamily)
     : relative;
-  return { args: ["--reconfigure", source, config], label: config };
+  return { args: ["--reconfigure", "--object", "default", source, config], label: config };
 }
 
 function makeConfigItems(

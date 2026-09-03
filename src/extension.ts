@@ -11,6 +11,37 @@ import { ImdeDiagnostics } from "./diagnostics";
 import type { MapParseResult } from "./mapview/parser";
 import { selectDefconfig, saveDefconfig } from "./defconfig";
 import { syncIntelliSense } from "./intelliSense";
+
+function extensionKconfig(projectDir: string): string | undefined {
+  try {
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    const kconfigs: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const manifest = path.join(projectDir, entry.name, "imde-extension.json");
+      if (fs.existsSync(manifest)) {
+        const data = JSON.parse(fs.readFileSync(manifest, "utf8")) as { kconfig?: unknown };
+        if (typeof data.kconfig !== "string" || !data.kconfig.trim()) continue;
+        const kconfig = path.resolve(projectDir, data.kconfig);
+        if (fs.existsSync(kconfig)) kconfigs.push(kconfig);
+      }
+    }
+    if (kconfigs.length === 0) return undefined;
+    const generated = path.join(projectDir, ".imde", "kconfig", "extensions.Kconfig");
+    const content = [
+      'mainmenu "SDK Configuration"',
+      `source "${path.join(projectDir, "Kconfig")}"`,
+      ...kconfigs.map(kconfig => `source "${kconfig}"`),
+      "",
+    ].join("\n");
+    fs.mkdirSync(path.dirname(generated), { recursive: true });
+    if (!fs.existsSync(generated) || fs.readFileSync(generated, "utf8") !== content) {
+      fs.writeFileSync(generated, content, "utf8");
+    }
+    return generated;
+  } catch { /* fall back to the base Kconfig */ }
+  return undefined;
+}
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const PACKAGE_JSON = require("../package.json") as { version?: string };
 // Cache for parsed .map files: path -> { mtime, data }.  Bounded to prevent unbounded growth.
@@ -551,7 +582,14 @@ export function activate(context: vscode.ExtensionContext) {
 
       try {
         const { MenuconfigPanel } = await import("./menuconfig/MenuconfigPanel");
-        MenuconfigPanel.createOrShow(context.extensionUri, workspaceFolder.uri, context);
+        const target = extensionKconfig(projDir);
+        MenuconfigPanel.createOrShow(
+          context.extensionUri,
+          workspaceFolder.uri,
+          context,
+          target ? vscode.Uri.file(target) : undefined,
+          vscode.Uri.file(configPath),
+        );
       } catch (error: any) {
         vscode.window.showErrorMessage(`Failed to open IMDE GUI Config: ${error.message}`);
       }

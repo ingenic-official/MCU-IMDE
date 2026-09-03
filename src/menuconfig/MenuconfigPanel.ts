@@ -44,7 +44,8 @@ export class MenuconfigPanel {
     extensionUri: vscode.Uri,
     curWorkspaceFolder: vscode.Uri,
     context: vscode.ExtensionContext,
-    targetFile?: vscode.Uri
+    targetFile?: vscode.Uri,
+    configFile?: vscode.Uri
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -68,6 +69,7 @@ export class MenuconfigPanel {
       column || vscode.ViewColumn.One,
       curWorkspaceFolder,
       targetFile,
+      configFile,
       context
     );
   }
@@ -82,6 +84,7 @@ export class MenuconfigPanel {
   private disposables: vscode.Disposable[] = [];
   private kconfigServer: KconfigServer | null = null;
   private targetFile?: vscode.Uri;
+  private configFile?: vscode.Uri;
   private kconfigServerReady = false;
   private pendingInitValuesRequest = false;
   private initialPayloadTransferToken = 0;
@@ -98,11 +101,13 @@ export class MenuconfigPanel {
     column: vscode.ViewColumn,
     curWorkspaceFolder: vscode.Uri,
     targetFile: vscode.Uri | undefined,
+    configFile: vscode.Uri | undefined,
     private extContext: vscode.ExtensionContext
   ) {
     this.panelId = ++MenuconfigPanel.panelSeq;
     this.curWorkspaceFolder = curWorkspaceFolder;
     this.targetFile = targetFile;
+    this.configFile = configFile;
     this.trace(`constructor start target=${targetFile?.fsPath || "(active)"}`);
 
     const menuconfigPanelTitle = targetFile 
@@ -430,6 +435,7 @@ export class MenuconfigPanel {
         const server = await KconfigServer.init({
           workspaceFolder: this.curWorkspaceFolder,
           kconfigFile: kconfigFile,
+          configFile: this.configFile?.fsPath,
         });
         if (this._disposed || initToken !== this.initializationToken) {
           this.trace(`initializeKconfigServer stale result dropped token=${initToken}`);

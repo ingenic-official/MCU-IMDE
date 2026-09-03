@@ -19,7 +19,7 @@ function check(cond: boolean, msg: string) {
 function withTempProject(run: (dir: string) => void) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "imde-intellisense-"));
   try {
-    fs.mkdirSync(path.join(dir, "build"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "build", "default"), { recursive: true });
     run(dir);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -28,7 +28,7 @@ function withTempProject(run: (dir: string) => void) {
 
 function writeCompileCommands(projectDir: string, entries: unknown[]) {
   fs.writeFileSync(
-    path.join(projectDir, "build", "compile_commands.json"),
+    path.join(projectDir, "build", "default", "compile_commands.json"),
     JSON.stringify(entries, null, 2),
     "utf-8"
   );
@@ -36,7 +36,7 @@ function writeCompileCommands(projectDir: string, entries: unknown[]) {
 
 function testSplitIncludeAndDefineArguments() {
   withTempProject((dir) => {
-    const buildDir = path.join(dir, "build");
+    const buildDir = path.join(dir, "build", "default");
     writeCompileCommands(dir, [
       {
         directory: buildDir,
@@ -68,7 +68,7 @@ function testSplitIncludeAndDefineArguments() {
 
 function testQuotedCommandLineArguments() {
   withTempProject((dir) => {
-    const buildDir = path.join(dir, "build");
+    const buildDir = path.join(dir, "build", "default");
     writeCompileCommands(dir, [
       {
         directory: buildDir,
@@ -87,7 +87,7 @@ function testQuotedCommandLineArguments() {
 
 function testRepeatedSyncDoesNotRewriteUnchangedConfig() {
   withTempProject((dir) => {
-    const buildDir = path.join(dir, "build");
+    const buildDir = path.join(dir, "build", "default");
     writeCompileCommands(dir, [{
       directory: buildDir,
       arguments: ["gcc", "-I", "../include", "-DREPEATED", "-std=c17", "main.c"],

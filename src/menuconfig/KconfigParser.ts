@@ -92,7 +92,9 @@ export class KconfigParser {
                 ? srctreeEnv
                 : path.resolve(this.workspaceFolder, srctreeEnv);
         } else {
-            this.srctreeRoot = path.dirname(this.mainKconfigFile);
+            // Kconfig's srctree is the project root, even when the entry file
+            // is a generated extension file under .imde.
+            this.srctreeRoot = this.workspaceFolder;
         }
     }
 

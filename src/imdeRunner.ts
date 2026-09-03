@@ -249,6 +249,18 @@ export class ImdeRunner implements vscode.Disposable {
     return null;
   }
 
+  private extensionArgs(proj: string): string[] {
+    const manifests: string[] = [];
+    try {
+      for (const entry of fs.readdirSync(proj, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const manifest = path.join(proj, entry.name, "imde-extension.json");
+        if (fs.existsSync(manifest)) manifests.push(manifest);
+      }
+    } catch { /* optional extensions are best-effort here; CLI reports invalid manifests */ }
+    return manifests.flatMap(manifest => ["--extension", manifest]);
+  }
+
   private spawnImdeBin(bin: string, args: string[]): { exe: string; args: string[] } {
     if (process.platform === "win32") {
       return { exe: bin, args };
@@ -299,10 +311,12 @@ export class ImdeRunner implements vscode.Disposable {
     }
     const proj = this._projectRoot!;
     const { terminal } = this.getSharedTerminal(proj);
-
+    const object = vscode.workspace.getConfiguration("imde").get<string>("buildObject") || "default";
+    const objectCommands = new Set(["status", "artifacts", "configure", "build", "clean", "fullclean", "menuconfig"]);
+    const effectiveArgs = objectCommands.has(cmd) ? [...args, object] : args;
     if (cmd) {
       void this.ensureTerminalEnv(proj).then(() => {
-        terminal.sendText(this.formatVisibleImdeCommand(cmd, args));
+        terminal.sendText(this.formatVisibleImdeCommand(cmd, effectiveArgs));
       });
     }
     if (opts?.show) {
@@ -496,15 +510,20 @@ export class ImdeRunner implements vscode.Disposable {
     }
     const proj = this._projectRoot!;
     const imdeBin = this.imdeBin();
+    const object = vscode.workspace.getConfiguration("imde").get<string>("buildObject") || "default";
+    const objectCommands = new Set(["status", "artifacts", "configure", "build", "clean", "fullclean", "menuconfig"]);
+    const effectiveArgs = objectCommands.has(cmd) ? [...args, object] : args;
+    const extensionArgs = this.extensionArgs(proj);
 
     let spawnArgs: string[];
     let spawnExe: string;
     if (imdeBin) {
       const s = this.spawnImdeBin(imdeBin, [
         "--project-dir", proj,
+        ...extensionArgs,
         ...(opts.json ? ["--json"] : []),
         cmd,
-        ...args,
+        ...effectiveArgs,
       ]);
       spawnExe = s.exe;
       spawnArgs = s.args;
@@ -521,7 +540,7 @@ export class ImdeRunner implements vscode.Disposable {
         return Promise.resolve({ code: null, stdout: "", stderr: message, timedOut: false, commandLine: "" });
       }
       spawnExe = py;
-      spawnArgs = [imde, "--project-dir", proj, ...(opts.json ? ["--json"] : []), cmd, ...args];
+      spawnArgs = [imde, "--project-dir", proj, ...extensionArgs, ...(opts.json ? ["--json"] : []), cmd, ...effectiveArgs];
     }
 
     const commandLine = this.formatForLog([spawnExe, ...spawnArgs]);
@@ -888,7 +907,7 @@ export class ImdeRunner implements vscode.Disposable {
 
   private formatVisibleImdeCommand(cmd: string, args: string[]): string {
     const shell = (vscode.env.shell || "").toLowerCase();
-    const tokens = ["imde", cmd, ...args].filter(Boolean);
+    const tokens = ["imde", ...this.extensionArgs(this._projectRoot || ""), cmd, ...args].filter(Boolean);
     return tokens.map((token) => this.quoteTerminalArg(token, shell, { bareSimple: true })).join(" ");
   }
 
