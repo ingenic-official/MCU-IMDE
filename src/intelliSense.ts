@@ -41,7 +41,7 @@ interface IntelliSenseSummary {
 export function parseCompileCommands(
   projectDir: string
 ): IntelliSenseSummary | null {
-  const buildDir = path.join(projectDir, "build");
+  const buildDir = path.join(projectDir, "build", "default");
   const ccPath = path.join(buildDir, "compile_commands.json");
 
   if (!fs.existsSync(ccPath)) {

@@ -2,7 +2,7 @@
   "name": "imde",
   "displayName": "IMDE",
   "description": "Ingenic MCU Development Environment for VS Code",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "publisher": "ingenic",
   "license": "ISC",
   "repository": {
@@ -222,6 +222,11 @@
           "type": "string",
           "default": "IMDE",
           "description": "Terminal name used for interactive IMDE commands."
+        },
+        "imde.buildObject": {
+          "type": "string",
+          "default": "default",
+          "description": "Build object used by IMDE commands, for example default or uart-test."
         },
         "imde.captureTimeoutMs": {
           "type": "number",
