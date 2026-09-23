@@ -1,0 +1,73 @@
+Archive member included to satisfy reference by file (symbol)
+
+D:/toolchain/lib/gcc/riscv32-unknown-elf/12.1.0/rv32imac/ilp32\libgcc.a(_udivdi3.o)
+                              CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj (__udivdi3)
+
+Discarded input sections
+
+ .text          0x0000000000000000        0x0 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+
+LOAD CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+LOAD CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+LOAD CMakeFiles/test_firmware.dir/code/soc/startup/vectors.S.obj
+LOAD D:/toolchain/lib/gcc/riscv32-unknown-elf/12.1.0/rv32imac/ilp32\libgcc.a
+                0x0000000000000080                __VECTORS_SIZE = 0x80
+                0x0000000000000100                __VECTORS_SECTION_SIZE = 0x100
+
+.vectors        0x0000000080000000      0x100
+                0x0000000080000000                __ro_start = .
+ *(.vectors)
+ .vectors       0x0000000080000000      0x100 CMakeFiles/test_firmware.dir/code/soc/startup/vectors.S.obj
+
+.start          0x0000000080000100       0xa2
+ *(.start_section)
+ .start_section
+                0x0000000080000100       0xa2 CMakeFiles/test_firmware.dir/code/soc/startup/vectors.S.obj
+
+.text           0x0000000080000200     0x2000
+ *(.text*)
+ .text.im_log_default_lock
+                0x0000000080000200       0x10 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+ .text.im_log_set_level
+                0x0000000080000210      0x100 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+ .text.hal_uart_init
+                0x0000000080000310      0x200 CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+ .text.hal_uart_send
+                0x0000000080000510      0x300 CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+ .text.__udivdi3
+                0x0000000080000810      0x100 D:/toolchain/lib/gcc/riscv32-unknown-elf/12.1.0/rv32imac/ilp32\libgcc.a(_udivdi3.o)
+ *(.rodata*)
+ .rodata.log_level_names
+                0x0000000080000910       0x40 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+ .rodata.uart_baud_table
+                0x0000000080000950       0x80 CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+ *(.srodata*)
+ .srodata.cst8
+                0x00000000800009d0       0x30 D:/toolchain/lib/gcc/riscv32-unknown-elf/12.1.0/rv32imac/ilp32\libgcc.a(_udivdi3.o)
+ *fill*         0x0000000080000a00        0x4
+                0x0000000080002204                __ro_end = .
+
+.data           0x0000000080000a04      0x400
+ *(.data*)
+ .data.s_sdk_log_state
+                0x0000000080000a04      0x200 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+ .data.uart_rx_buf
+                0x0000000080000c04      0x200 CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+
+.bss            0x0000000080000e04      0x300
+ *(.bss*)
+ .bss.uart_isr_ctx
+                0x0000000080000e04      0x200 CMakeFiles/test_firmware.dir/code/drivers/uart/hal_uart.c.obj
+ .bss.log_backend
+                0x0000000080001004      0x100 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+
+.debug_info     0x0000000000000000     0xaaaa
+ .debug_info    0x0000000000000000     0x100 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+
+.debug_frame    0x0000000000000000      0x100
+ .debug_frame   0x0000000000000000       0x20 CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
+
+.user_heap      0x0000000080001304  0x1000000
+
+.comment        0x0000000000000000      0x100
+ .comment       0x0000000000000000       0x5c CMakeFiles/test_firmware.dir/code/common/src/im_log.c.obj
