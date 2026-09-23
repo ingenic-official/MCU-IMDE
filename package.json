@@ -1,0 +1,298 @@
+{
+  "name": "imde",
+  "displayName": "IMDE",
+  "description": "Ingenic MCU Development Environment for VS Code",
+  "version": "0.3.7",
+  "publisher": "ingenic",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ingenic-official/MCU-IMDE.git"
+  },
+  "homepage": "https://github.com/ingenic-official/MCU-IMDE#readme",
+  "bugs": {
+    "url": "https://github.com/ingenic-official/MCU-IMDE/issues"
+  },
+  "keywords": [
+    "ingenic",
+    "mcu",
+    "embedded",
+    "kconfig",
+    "pinmux"
+  ],
+  "sideEffects": [
+    "*.scss",
+    "*.css",
+    "*.vue"
+  ],
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:imde.json",
+    "onCommand:imde.guiConfig",
+    "onCommand:imde.pinmux",
+    "onCommand:imde.build",
+    "onCommand:imde.doctor",
+    "onCommand:imde.fullCleanBuild",
+    "onCommand:imde.viewMap",
+    "onView:imde.doctorView",
+    "onView:imde.buildView",
+    "onView:imde.artifactsView"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "imde.doctor",
+        "title": "IMDE: Run Doctor",
+        "icon": "$(heart)"
+      },
+      {
+        "command": "imde.build",
+        "title": "IMDE: Build",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "imde.fullCleanBuild",
+        "title": "IMDE: FullClean & Build",
+        "icon": ""
+      },
+      {
+        "command": "imde.configure",
+        "title": "IMDE: Configure"
+      },
+      {
+        "command": "imde.menuconfig",
+        "title": "IMDE: Menuconfig"
+      },
+      {
+        "command": "imde.guiConfig",
+        "title": "IMDE: GUI Config",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "imde.pinmux",
+        "title": "IMDE: Pinmux",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "imde.clean",
+        "title": "IMDE: Clean"
+      },
+      {
+        "command": "imde.fullclean",
+        "title": "IMDE: Full Clean"
+      },
+      {
+        "command": "imde.selectDefconfig",
+        "title": "IMDE: Select Defconfig",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "imde.saveDefconfig",
+        "title": "IMDE: Save Defconfig"
+      },
+      {
+        "command": "imde.setupToolchain",
+        "title": "IMDE: Setup Toolchain"
+      },
+      {
+        "command": "imde.status",
+        "title": "IMDE: Show Status"
+      },
+      {
+        "command": "imde.artifacts",
+        "title": "IMDE: Show Artifacts"
+      },
+      {
+        "command": "imde.copyPath",
+        "title": "IMDE: Copy Path",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "imde.revealFile",
+        "title": "IMDE: Reveal File",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "imde.refresh",
+        "title": "IMDE: Refresh View",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "imde.viewMap",
+        "title": "IMDE: View Map",
+        "icon": "$(symbol-color)"
+      },
+      {
+        "command": "imde.openFile",
+        "title": "IMDE: Open Source File"
+      },
+      {
+        "command": "imde.setupIntelliSense",
+        "title": "IMDE: Setup IntelliSense"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "imde-sidebar",
+          "title": "IMDE",
+          "icon": "media/ingenic_blue.svg"
+        }
+      ]
+    },
+    "views": {
+      "imde-sidebar": [
+        {
+          "id": "imde.doctorView",
+          "name": "Environment"
+        },
+        {
+          "id": "imde.buildView",
+          "name": "Build & Config"
+        },
+        {
+          "id": "imde.artifactsView",
+          "name": "Artifacts"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "imde.refresh",
+          "when": "view == imde.doctorView",
+          "group": "navigation"
+        },
+        {
+          "command": "imde.refresh",
+          "when": "view == imde.artifactsView",
+          "group": "navigation"
+        },
+        {
+          "command": "imde.build",
+          "when": "view == imde.buildView",
+          "group": "navigation"
+        },
+        {
+          "command": "imde.selectDefconfig",
+          "when": "view == imde.buildView",
+          "group": "navigation"
+        },
+        {
+          "command": "imde.pinmux",
+          "when": "view == imde.buildView",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "imde.copyPath",
+          "when": "view == imde.artifactsView && viewItem == imdeArtifact",
+          "group": "inline"
+        },
+        {
+          "command": "imde.revealFile",
+          "when": "view == imde.artifactsView && viewItem == imdeArtifact",
+          "group": "inline"
+        },
+        {
+          "command": "imde.viewMap",
+          "when": "view == imde.artifactsView && viewItem == imdeMapArtifact",
+          "group": "inline@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "IMDE",
+      "properties": {
+        "imde.projectDir": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Override the SDK project directory. When empty, IMDE searches upward from the first workspace folder for imde.json."
+        },
+        "imde.terminalName": {
+          "type": "string",
+          "default": "IMDE",
+          "description": "Terminal name used for interactive IMDE commands."
+        },
+        "imde.buildObject": {
+          "type": "string",
+          "default": "default",
+          "description": "Build object used by IMDE commands, for example default or uart-test."
+        },
+        "imde.captureTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 1000,
+          "description": "Timeout in milliseconds for short JSON capture commands used by IMDE views."
+        },
+        "imde.commandTimeoutMs": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Timeout in milliseconds for non-interactive IMDE commands. Use 0 to disable the timeout."
+        },
+        "imde.showOutputOnError": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reveal the shared IMDE terminal when a managed command fails."
+        },
+        "imde.guiConfig.autoHeaderPath": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "Path to write the generated C header file. Leave empty to skip header generation (SDK uses CMake-generated sdk_config.h)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "webpack --mode production",
+    "compile": "webpack --mode development",
+    "check": "webpack --mode development",
+    "typecheck": "tsc --noEmit && tsc --project test/tsconfig.json --noEmit",
+    "watch": "webpack --mode development --watch",
+    "verify": "npm run typecheck && npm run check && npm test && npm run package:dry",
+    "test": "npm run test:parser && npm run test:kconfig && npm run test:diag && npm run test:intellisense && npm run test:pinmux && npm run test:board-pinmux",
+    "test:parser": "npx ts-node --project test/tsconfig.json test/parser.test.ts",
+    "test:kconfig": "npx ts-node --project test/tsconfig.json test/kconfig.test.ts",
+    "test:diag": "npx ts-node --project test/tsconfig.json test/diagnostics.test.ts",
+    "test:intellisense": "npx ts-node --project test/tsconfig.json test/intelliSense.test.ts",
+    "test:pinmux": "npx ts-node --project test/tsconfig.json test/pinmuxDiscovery.test.ts",
+    "test:board-pinmux": "npx ts-node --project test/tsconfig.json test/boardPinmuxParser.test.ts && npx ts-node --project test/tsconfig.json test/boardPinmuxGenerator.test.ts && npx ts-node --project test/tsconfig.json test/pinmuxBoardFiles.test.ts && npx ts-node --project test/tsconfig.json test/pinmuxBoardWorkspace.test.ts",
+    "package": "vsce package",
+    "package:dry": "vsce ls",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "@vue/compiler-sfc": "^3.3.4",
+    "css-loader": "^6.8.1",
+    "sass": "^1.64.1",
+    "sass-loader": "^13.3.2",
+    "ts-loader": "^9.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "vue-loader": "^17.2.2",
+    "vue-style-loader": "^4.1.3",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "@iconify-prerendered/vue-codicon": "^0.28.1753246500",
+    "@vscode/codicons": "^0.0.35",
+    "glob": "^11.0.3",
+    "pinia": "^2.1.6",
+    "vue": "^3.3.4"
+  }
+}
