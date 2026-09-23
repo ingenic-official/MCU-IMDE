@@ -275,7 +275,7 @@
   "devDependencies": {
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.22.0",
+    "@vscode/vsce": "^4.0.0",
     "@vue/compiler-sfc": "^3.3.4",
     "css-loader": "^6.8.1",
     "sass": "^1.64.1",
