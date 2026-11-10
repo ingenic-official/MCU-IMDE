@@ -1,0 +1,56 @@
+name: Clean historical coauthor attribution
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/clean-claude-history.yml
+
+permissions:
+  contents: write
+
+jobs:
+  clean-history:
+    if: github.repository == 'ingenic-official/MCU-IMDE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch --tags --force origin
+
+      - name: Rewrite historical coauthor trailers
+        env:
+          FILTER_BRANCH_SQUELCH_WARNING: "1"
+        run: |
+          set -euo pipefail
+          git filter-branch -f \
+            --tree-filter 'rm -f .github/workflows/clean-claude-history.yml' \
+            --msg-filter "sed '/^Co-Authored-By: Claude <noreply@anthropic.com>$/d'" \
+            --tag-name-filter cat \
+            -- --all
+
+          git for-each-ref --format='%(refname)' refs/original | while IFS= read -r ref; do
+            git update-ref -d "$ref"
+          done
+
+          git reflog expire --expire=now --all
+          git gc --prune=now
+
+          if git log --branches --tags --format='%B' | grep -Fq 'Co-Authored-By: Claude'; then
+            echo "Claude coauthor trailers still exist after rewrite" >&2
+            exit 1
+          fi
+
+          echo "Rewritten main: $(git rev-parse HEAD)"
+
+      - name: Force update main and tags
+        run: |
+          set -euo pipefail
+          git push --force --atomic origin HEAD:refs/heads/main --tags
